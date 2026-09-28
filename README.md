@@ -26,6 +26,11 @@ All demo accounts use `password123`.
 | Manufacturer | `mfr@apex.com` |
 | Stockist | `stockist@city.com` |
 
+Passwords are stored as scrypt hashes, so `password123` in the table above is the
+value you type, not what sits in the database. The demo password is deliberately
+weak and public: replace it, and raise the sign-up minimum, before this is
+exposed to anyone.
+
 ## Where to edit what
 
 - `src/app/login/page.tsx`: login and demo quick-fill panel.

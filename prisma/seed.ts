@@ -1,6 +1,10 @@
 import { PrismaClient } from "@prisma/client"
 
+import { hashPassword } from "../src/lib/password"
+
 const prisma = new PrismaClient()
+
+const DEMO_PASSWORD = "password123"
 
 const manufacturers = [
   { name: "Apex Pharma", prefix: "apex", drugLicense: "DL-APEX-123", gstNumber: "GST-APEX-123" },
@@ -73,11 +77,15 @@ async function main() {
   await prisma.organization.deleteMany()
 
   await prisma.user.create({
-    data: { email: "admin@pharmalink.com", password: "password123", role: "ADMIN" },
+    data: {
+      email: "admin@pharmalink.com",
+      password: await hashPassword(DEMO_PASSWORD),
+      role: "ADMIN",
+    },
   })
 
   const manufacturerRecords = await Promise.all(
-    manufacturers.map((manufacturer, index) => prisma.organization.create({
+    manufacturers.map(async (manufacturer, index) => prisma.organization.create({
       data: {
         name: manufacturer.name,
         type: "MANUFACTURER",
@@ -85,13 +93,19 @@ async function main() {
         gstNumber: manufacturer.gstNumber,
         region: ["West", "South", "North", "East"][index],
         status: "VERIFIED",
-        users: { create: { email: `mfr@${manufacturer.prefix}.com`, password: "password123", role: "MANUFACTURER" } },
+        users: {
+          create: {
+            email: `mfr@${manufacturer.prefix}.com`,
+            password: await hashPassword(DEMO_PASSWORD),
+            role: "MANUFACTURER",
+          },
+        },
       },
     }))
   )
 
   const stockistRecords = await Promise.all(
-    stockists.map((stockist, index) => prisma.organization.create({
+    stockists.map(async (stockist, index) => prisma.organization.create({
       data: {
         name: stockist.name,
         type: "STOCKIST",
@@ -99,7 +113,13 @@ async function main() {
         gstNumber: stockist.gstNumber,
         region: ["West", "South", "North"][index],
         status: "VERIFIED",
-        users: { create: { email: `stockist@${stockist.prefix}.com`, password: "password123", role: "STOCKIST" } },
+        users: {
+          create: {
+            email: `stockist@${stockist.prefix}.com`,
+            password: await hashPassword(DEMO_PASSWORD),
+            role: "STOCKIST",
+          },
+        },
       },
     }))
   )
@@ -428,7 +448,7 @@ async function main() {
 
   console.log(`Created ${productCount} products, ${schemeCount} schemes, ${manufacturerRecords.length} manufacturers, and ${stockistRecords.length} stockists.`)
   console.log(`Created ${orderCount} orders (${deliveredCount} delivered) and ${inventoryBatchCount} current inventory batches.`)
-  console.log("Demo credentials: admin@pharmalink.com, mfr@apex.com, stockist@city.com / password123")
+  console.log(`Demo credentials: admin@pharmalink.com, mfr@apex.com, stockist@city.com / ${DEMO_PASSWORD}`)
 }
 
 main()

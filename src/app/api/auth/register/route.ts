@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { hashPassword } from "@/lib/password"
 import * as z from "zod"
 
 const registerSchema = z.object({
@@ -26,6 +27,7 @@ export async function POST(req: Request) {
     }
 
     // Create organization and user in a transaction
+    const hashed = await hashPassword(parsed.password)
     const result = await prisma.$transaction(async (tx) => {
       const org = await tx.organization.create({
         data: {
@@ -40,7 +42,7 @@ export async function POST(req: Request) {
       const user = await tx.user.create({
         data: {
           email: parsed.email,
-          password: parsed.password, // Plain text for demo, use bcrypt in real app
+          password: hashed,
           role: parsed.type, // Map organization type directly to user role
           organizationId: org.id,
         },
