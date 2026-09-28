@@ -50,11 +50,36 @@ Phase 2 adds the local `pdfkit` dependency for real purchase-order and invoice P
 ## Useful commands
 
 ```bash
-npm run dev       # start the Next.js app
-npm run build     # production compile and type-check
-npm run lint      # ESLint
-npx tsc --noEmit  # TypeScript check
+npm run dev              # start the Next.js app
+npm run build            # production compile and type-check
+npm run lint             # ESLint
+npm run typecheck        # TypeScript check
+npm test                 # unit tests, no server needed
+npm run test:integration # order lifecycle over HTTP, needs a build
+npm run verify           # typecheck + lint + unit tests
 ```
+
+## Tests
+
+`npm test` covers the business rules as pure functions: the FEFO allocator, the
+price and discount arithmetic, the order status machine, and the analytics
+forecasts. It needs nothing but the repository.
+
+`npm run test:integration` runs the order lifecycle against a real server, which
+is the only way to check that the routes call those rules correctly, that one
+organization cannot read another's orders, and that cancelling puts stock back
+where it came from. It needs a seeded database and a production build:
+
+```bash
+npx prisma db seed
+npm run build
+npm run test:integration
+```
+
+The suite starts its own server on a free port and restores `prisma/dev.db`
+afterwards, including when a run fails, so your working copy is left as it was
+found. The dataset itself is not byte-for-byte reproducible between seeds, so
+compare a dump rather than a checksum if you need to check the restore.
 
 The local SQLite database is `prisma/dev.db`. To reseed it manually, run `npx prisma db seed` after resetting or removing the local database.
 
