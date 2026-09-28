@@ -1,36 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PharmaLink
 
-## Getting Started
+PharmaLink is a B2B pharmaceutical procurement workspace for verified manufacturers and stockists. It includes role-based authentication, manufacturer discovery and access requests, filtered catalogues, favourites, server-calculated purchase orders, FEFO stock reservation, order tracking, PDF documents, admin verification, and live operational dashboards.
 
-First, run the development server:
+## Run locally
+
+Prerequisites: Node.js 20+ and npm.
 
 ```bash
+npm install
+npx prisma generate
+npx prisma db push
+npx prisma db seed
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000. The development script uses Webpack because it is more reliable with the current Tailwind/PostCSS setup than the Turbopack CSS worker in this environment.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Demo accounts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+All demo accounts use `password123`.
 
-## Learn More
+| Role | Email |
+| --- | --- |
+| Admin | `admin@pharmalink.com` |
+| Manufacturer | `mfr@apex.com` |
+| Stockist | `stockist@city.com` |
 
-To learn more about Next.js, take a look at the following resources:
+## Where to edit what
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `src/app/login/page.tsx`: login and demo quick-fill panel.
+- `src/app/*/page.tsx`: role dashboards and workflow screens.
+- `src/app/api/**`: authenticated server routes.
+- `src/components/ui/`: shared controls.
+- `src/app/globals.css`: design tokens and global visual language.
+- `prisma/schema.prisma`: database models.
+- `prisma/seed.ts`: fictional demo organizations, products, batches, and access grants.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Main workflows
 
-## Deploy on Vercel
+- Admin: review pending business verifications at `/admin/verifications`.
+- Manufacturer: review stockist access requests at `/manufacturer/access-requests` and manage products at `/manufacturer/catalogue`.
+- Stockist: discover manufacturers and request access at `/stockist/manufacturers`.
+- Stockist: search authorized catalogues, filter by dosage/strength/price/availability/prescription status, inspect product details, favourite products, save drafts, and place one-manufacturer purchase orders at `/stockist/catalogue`.
+- Stockist: search/filter/export orders at `/stockist/orders`; inspect timelines, audit history, cancel valid orders, reorder, and download PO/invoice PDFs at `/stockist/orders/[id]`.
+- Order placement uses a Prisma transaction and allocates inventory by earliest expiry date first. MOQ, scheme discount, GST, notes, and totals are calculated on the server.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Phase 2 adds the local `pdfkit` dependency for real purchase-order and invoice PDF generation.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Useful commands
+
+```bash
+npm run dev       # start the Next.js app
+npm run build     # production compile and type-check
+npm run lint      # ESLint
+npx tsc --noEmit  # TypeScript check
+```
+
+The local SQLite database is `prisma/dev.db`. To reseed it manually, run `npx prisma db seed` after resetting or removing the local database.
+
+Drug-license verification in this prototype is simulated and does not replace regulatory compliance or professional review.

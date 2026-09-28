@@ -1,0 +1,255 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id             String        @id @default(cuid())
+  email          String        @unique
+  password       String
+  role           String // ADMIN, MANUFACTURER, STOCKIST
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  favourites     Favourite[]
+}
+
+model Organization {
+  id                 String           @id @default(cuid())
+  name               String
+  type               String // MANUFACTURER, STOCKIST
+  drugLicense        String?
+  gstNumber          String?
+  region             String?
+  status             String           @default("PENDING") // PENDING, REVIEW, VERIFIED, REJECTED
+  users              User[]
+  products           Product[]
+  grantedAccess      AccessGrant[]    @relation("ManufacturerGrants")
+  receivedAccess     AccessGrant[]    @relation("StockistGrants")
+  ordersPlaced       Order[]          @relation("BuyerOrders")
+  ordersReceived     Order[]          @relation("SellerOrders")
+  notifications      Notification[]
+  stockistDrafts     CartDraft[]      @relation("StockistDrafts")
+  manufacturerDrafts CartDraft[]      @relation("ManufacturerDrafts")
+  inventoryBatches   InventoryBatch[]
+  demandSamples      DemandSample[]
+  jobRuns            JobRun[]
+}
+
+model AccessGrant {
+  id             String       @id @default(cuid())
+  manufacturerId String
+  stockistId     String
+  status         String       @default("PENDING") // PENDING, VERIFIED, REJECTED
+  message        String?
+  requestedAt    DateTime     @default(now())
+  decidedAt      DateTime?
+  manufacturer   Organization @relation("ManufacturerGrants", fields: [manufacturerId], references: [id])
+  stockist       Organization @relation("StockistGrants", fields: [stockistId], references: [id])
+}
+
+model Notification {
+  id             String       @id @default(cuid())
+  organizationId String
+  type           String // ORDER_PLACED, ORDER_STATUS, ACCESS_REQUEST, ACCESS_DECISION, LOW_STOCK, EXPIRY, SCHEME
+  title          String
+  message        String
+  severity       String       @default("INFO") // INFO, WARNING, CRITICAL
+  link           String?
+  dedupeKey      String?
+  readAt         DateTime?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, dedupeKey])
+  @@index([organizationId, createdAt])
+}
+
+model Product {
+  id               String           @id @default(cuid())
+  manufacturerId   String
+  name             String
+  genericName      String
+  category         String           @default("General")
+  dosageForm       String           @default("Tablet")
+  strength         String           @default("")
+  packSize         String           @default("10 x 10")
+  gstPercent       Float            @default(12)
+  isPrescription   Boolean          @default(false)
+  storage          String           @default("Store below 25 C")
+  minOrderQty      Int              @default(1)
+  leadTimeDays     Int              @default(7)
+  mrp              Float
+  ptr              Float
+  pts              Float
+  isActive         Boolean          @default(true)
+  batches          Batch[]
+  schemes          Scheme[]
+  manufacturer     Organization     @relation(fields: [manufacturerId], references: [id])
+  orderItems       OrderItem[]
+  favourites       Favourite[]
+  draftItems       CartDraftItem[]
+  inventoryBatches InventoryBatch[]
+  demandSamples    DemandSample[]
+}
+
+model Favourite {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id])
+
+  @@unique([userId, productId])
+}
+
+model Scheme {
+  id              String   @id @default(cuid())
+  productId       String
+  name            String
+  type            String // SLAB_DISCOUNT, FREE_GOODS
+  minQuantity     Int      @default(1)
+  discountPercent Float    @default(0)
+  freeQuantity    Int      @default(0)
+  validFrom       DateTime
+  validUntil      DateTime
+  product         Product  @relation(fields: [productId], references: [id])
+}
+
+model Batch {
+  id          String                @id @default(cuid())
+  productId   String
+  batchNumber String
+  quantity    Int
+  mfgDate     DateTime
+  expiryDate  DateTime
+  product     Product               @relation(fields: [productId], references: [id])
+  allocations OrderItemAllocation[]
+}
+
+model InventoryBatch {
+  id            String       @id @default(cuid())
+  stockistId    String
+  productId     String
+  batchNumber   String
+  quantity      Int
+  mfgDate       DateTime?
+  expiryDate    DateTime
+  receivedAt    DateTime     @default(now())
+  sourceOrderId String?
+  stockist      Organization @relation(fields: [stockistId], references: [id])
+  product       Product      @relation(fields: [productId], references: [id])
+  sourceOrder   Order?       @relation(fields: [sourceOrderId], references: [id])
+
+  @@index([stockistId, productId])
+  @@index([stockistId, expiryDate])
+}
+
+model DemandSample {
+  id          String       @id @default(cuid())
+  stockistId  String
+  productId   String
+  periodStart DateTime
+  quantity    Int
+  source      String       @default("ORDER")
+  stockist    Organization @relation(fields: [stockistId], references: [id])
+  product     Product      @relation(fields: [productId], references: [id])
+
+  @@unique([stockistId, productId, periodStart])
+}
+
+model Order {
+  id               String           @id @default(cuid())
+  buyerId          String
+  sellerId         String
+  status           String           @default("PLACED") // PLACED, APPROVED, PACKED, DISPATCHED, DELIVERED, REJECTED, CANCELLED
+  subtotal         Float            @default(0)
+  discount         Float            @default(0)
+  gst              Float            @default(0)
+  total            Float
+  notes            String?
+  transporter      String?
+  trackingNumber   String?
+  invoiceNumber    String?
+  poNumber         String?
+  createdAt        DateTime         @default(now())
+  items            OrderItem[]
+  audits           OrderAudit[]
+  inventoryBatches InventoryBatch[]
+  buyer            Organization     @relation("BuyerOrders", fields: [buyerId], references: [id])
+  seller           Organization     @relation("SellerOrders", fields: [sellerId], references: [id])
+}
+
+model OrderAudit {
+  id        String   @id @default(cuid())
+  orderId   String
+  status    String
+  note      String?
+  createdAt DateTime @default(now())
+  order     Order    @relation(fields: [orderId], references: [id])
+}
+
+model CartDraft {
+  id             String          @id @default(cuid())
+  stockistId     String
+  manufacturerId String
+  notes          String?
+  updatedAt      DateTime        @updatedAt
+  createdAt      DateTime        @default(now())
+  items          CartDraftItem[]
+  stockist       Organization    @relation("StockistDrafts", fields: [stockistId], references: [id])
+  manufacturer   Organization    @relation("ManufacturerDrafts", fields: [manufacturerId], references: [id])
+}
+
+model CartDraftItem {
+  id        String    @id @default(cuid())
+  draftId   String
+  productId String
+  quantity  Int
+  draft     CartDraft @relation(fields: [draftId], references: [id])
+  product   Product   @relation(fields: [productId], references: [id])
+}
+
+model OrderItem {
+  id          String                @id @default(cuid())
+  orderId     String
+  productId   String
+  quantity    Int
+  price       Float
+  order       Order                 @relation(fields: [orderId], references: [id])
+  product     Product               @relation(fields: [productId], references: [id])
+  allocations OrderItemAllocation[]
+}
+
+model OrderItemAllocation {
+  id          String    @id @default(cuid())
+  orderItemId String
+  batchId     String
+  quantity    Int
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id])
+  batch       Batch     @relation(fields: [batchId], references: [id])
+
+  @@unique([orderItemId, batchId])
+}
+
+model JobRun {
+  id                   String        @id @default(cuid())
+  job                  String
+  status               String        @default("RUNNING") // RUNNING, SUCCESS, FAILED
+  trigger              String        @default("SCHEDULE") // SCHEDULE, MANUAL, SEED
+  notificationsCreated Int           @default(0)
+  notificationsSkipped Int           @default(0)
+  summary              String?
+  error                String?
+  startedAt            DateTime      @default(now())
+  finishedAt           DateTime?
+  organization         Organization? @relation(fields: [organizationId], references: [id])
+
+  organizationId String?
+
+  @@index([job, startedAt])
+}
