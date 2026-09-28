@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
 import { CalendarClock, CheckCircle2, PlayCircle, RefreshCw, TriangleAlert } from "lucide-react"
 
 import { CardSkeleton } from "@/components/skeletons"
@@ -163,11 +162,8 @@ export function JobsPanel() {
         <p className="text-xs leading-5 text-muted-foreground">
           In production the daemon runs the same job on a cron schedule via{" "}
           <code className="rounded bg-muted px-1.5 py-0.5">npm run jobs:daemon</code>. The job writes to the
-          notifications table only — no external service is contacted. See{" "}
-          <Link href="/stockist/notifications" className="font-medium text-primary hover:underline">
-            the notification centre
-          </Link>{" "}
-          for what a stockist sees.
+          notifications table only — no external service is contacted. The counts above are what each stockist
+          sees in their own notification centre.
         </p>
       </CardContent>
     </Card>
