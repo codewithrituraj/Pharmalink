@@ -46,6 +46,11 @@ function noise(seed: number) {
   return value - Math.floor(value)
 }
 
+/** Currency is stored to paise, so no float noise reaches the interface. */
+function rupees(value: number) {
+  return Math.round(value * 100) / 100
+}
+
 async function main() {
   console.log("Resetting and seeding PharmaLink demo data...")
 
@@ -126,9 +131,9 @@ async function main() {
             storage: category === "Vitamins" ? "Store in a cool, dry place" : "Store below 25 C",
             minOrderQty: variant === 1 ? 5 : 10,
             leadTimeDays: [5, 7, 10, 14][(productCount + variant) % 4],
-            mrp: basePrice * 1.5,
-            ptr: basePrice * 1.1,
-            pts: basePrice,
+            mrp: rupees(basePrice * 1.5),
+            ptr: rupees(basePrice * 1.1),
+            pts: rupees(basePrice),
             batches: {
               create: [
                 { batchNumber: `B-${manufacturerIndex + 1}-${productCount + 1}-A`, quantity: 5000 - manufacturerIndex * 350, mfgDate: new Date(), expiryDate: futureDate(365 + manufacturerIndex * 90) },

@@ -53,7 +53,8 @@ export async function GET() {
         forecast: point.forecast,
         lower: point.lowerBound,
         upper: point.upperBound,
-        isForecast: point.actual === null,
+        isForecast: point.forecast !== null,
+        hasRecord: point.actual !== null,
       })),
       assumptions: forecast.assumptions.map((assumption) => `${assumption.label}: ${assumption.value}`),
     }

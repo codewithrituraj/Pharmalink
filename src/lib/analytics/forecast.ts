@@ -60,6 +60,16 @@ export type Forecast = {
   generatedAt: string
 }
 
+/** A window month, tagged with how much can be trusted as demand evidence. */
+type SeriesPoint = DemandSampleInput & {
+  /** Position in the window, where 0 is the oldest month. */
+  index: number
+  /** A delivered order was recorded in this month. */
+  observed: boolean
+  /** The month in progress, so any total so far is a partial one. */
+  current: boolean
+}
+
 export const FORECAST_HORIZON_MONTHS = 3
 export const FORECAST_WINDOW_MONTHS = 18
 export const MIN_MONTHS_FOR_SEASONALITY = 8
@@ -70,14 +80,16 @@ const WEIGHTS = [0.2, 0.3, 0.5]
 const BAND_MULTIPLIER = 1.28
 
 /**
- * Builds a monthly demand series ending with the current month, filling any
- * month without a recorded sample with a zero so gaps are never interpolated.
+ * Builds a monthly demand series ending with the current month. Months without
+ * a recorded sample are kept as gaps rather than being interpolated or counted
+ * as zero demand, so a caller can tell "nothing was ordered" apart from
+ * "nothing is known".
  */
 function buildSeries(
   samples: DemandSampleInput[],
   windowMonths: number,
   now: Date,
-): { series: DemandSampleInput[]; observedMonths: number } {
+): { series: SeriesPoint[]; listedIndex: number; observedMonths: number } {
   const quantitiesByMonth = new Map<string, number>()
   for (const sample of samples) {
     const key = monthKey(sample.periodStart)
@@ -85,17 +97,26 @@ function buildSeries(
   }
 
   const current = monthStart(now)
-  const series: DemandSampleInput[] = []
-  let observedMonths = 0
+  const series: SeriesPoint[] = []
 
   for (let offset = windowMonths - 1; offset >= 0; offset -= 1) {
     const periodStart = addMonths(current, -offset)
     const quantity = quantitiesByMonth.get(monthKey(periodStart)) ?? 0
-    if (quantity > 0) observedMonths += 1
-    series.push({ periodStart, quantity })
+    series.push({
+      periodStart,
+      quantity,
+      index: windowMonths - 1 - offset,
+      observed: quantity > 0,
+      current: offset === 0,
+    })
   }
 
-  return { series, observedMonths }
+  const firstObserved = series.findIndex((point) => point.observed)
+  return {
+    series,
+    listedIndex: firstObserved === -1 ? series.length : firstObserved,
+    observedMonths: series.filter((point) => point.observed).length,
+  }
 }
 
 function weightedAverage(values: number[]) {
@@ -110,17 +131,22 @@ function weightedAverage(values: number[]) {
   return totalWeight > 0 ? weighted / totalWeight : 0
 }
 
-function leastSquaresSlope(values: number[]) {
-  const count = values.length
+/**
+ * Least-squares slope in units per month. The x values are real month offsets
+ * rather than array positions, so irregular gaps between orders do not
+ * compress the series and exaggerate the trend.
+ */
+function leastSquaresSlopeAt(points: { x: number; y: number }[]) {
+  const count = points.length
   if (count < 3) return 0
-  const xMean = (count - 1) / 2
-  const yMean = values.reduce((sum, value) => sum + value, 0) / count
+  const xMean = points.reduce((sum, point) => sum + point.x, 0) / count
+  const yMean = points.reduce((sum, point) => sum + point.y, 0) / count
   let numerator = 0
   let denominator = 0
-  values.forEach((value, index) => {
-    numerator += (index - xMean) * (value - yMean)
-    denominator += (index - xMean) ** 2
-  })
+  for (const point of points) {
+    numerator += (point.x - xMean) * (point.y - yMean)
+    denominator += (point.x - xMean) ** 2
+  }
   return denominator === 0 ? 0 : numerator / denominator
 }
 
@@ -184,12 +210,26 @@ export function buildForecast(
   const now = options.now ?? new Date()
   const horizonMonths = options.horizonMonths ?? FORECAST_HORIZON_MONTHS
   const windowMonths = options.windowMonths ?? FORECAST_WINDOW_MONTHS
-  const { series, observedMonths } = buildSeries(samples, windowMonths, now)
-  const values = series.map((sample) => sample.quantity)
-  const averageMonthly = values.length
-    ? values.reduce((sum, value) => sum + value, 0) / values.length
+  const { series, listedIndex, observedMonths } = buildSeries(
+    samples,
+    windowMonths,
+    now,
+  )
+  // A month with no delivered order is missing data, not proof of zero demand:
+  // the stockist may simply not have reordered that month, and the product may
+  // pre-date the start of the recorded history. Statistics therefore run only
+  // over months that carry a sample, and the month in progress is dropped
+  // because a partial month would understate demand.
+  const listed = series.filter((point) => point.index >= listedIndex)
+  const complete = listed.filter((point) => point.observed && !point.current)
+  const basis = complete.length > 0
+    ? complete
+    : listed.filter((point) => point.observed)
+  const observedValues = basis.map((point) => point.quantity)
+  const averageMonthly = observedValues.length
+    ? observedValues.reduce((sum, value) => sum + value, 0) / observedValues.length
     : 0
-  const seasonalIndices = buildSeasonalIndices(series, averageMonthly)
+  const seasonalIndices = buildSeasonalIndices(basis, averageMonthly)
   const notes = [
     "Forecasts are decision support derived from your own order history. They are estimates, not demand guarantees.",
     "Demand is measured in ordered units from delivered and in-flight purchase orders; cancelled and rejected orders are excluded.",
@@ -226,20 +266,22 @@ export function buildForecast(
     }
   }
 
-  const variability = standardDeviation(values, averageMonthly)
+  const variability = standardDeviation(observedValues, averageMonthly)
   const variabilityPercent = averageMonthly > 0 ? variability / averageMonthly : 0
   const useSeasonality = observedMonths >= MIN_MONTHS_FOR_SEASONALITY
   const sparse = observedMonths < 3
-  const baselineMonthly = sparse ? averageMonthly : weightedAverage(values)
-  const rawSlope = sparse ? 0 : leastSquaresSlope(values)
+  const baselineMonthly = sparse ? averageMonthly : weightedAverage(observedValues)
+  const rawSlope = sparse
+    ? 0
+    : leastSquaresSlopeAt(basis.map((point) => ({ x: point.index, y: point.quantity })))
   const trendPercentPerMonth = averageMonthly > 0
     ? Math.max(-MAX_TREND_PER_MONTH, Math.min(MAX_TREND_PER_MONTH, rawSlope / averageMonthly))
     : 0
 
-  const history: ForecastPoint[] = series.map((sample) => ({
-    periodKey: monthKey(sample.periodStart),
-    label: monthLabel(sample.periodStart),
-    actual: sample.quantity,
+  const history: ForecastPoint[] = series.map((point) => ({
+    periodKey: monthKey(point.periodStart),
+    label: monthLabel(point.periodStart),
+    actual: point.observed && point.index >= listedIndex ? point.quantity : null,
     forecast: null,
     lowerBound: null,
     upperBound: null,
@@ -284,6 +326,10 @@ export function buildForecast(
       value: sparse
         ? "Simple average — too few months for a moving average"
         : `Weighted ${WEIGHTS.length}-month moving average (${WEIGHTS.map((weight) => `${Math.round(weight * 100)}%`).join(" / ")})`,
+    },
+    {
+      label: "Months without an order",
+      value: "Treated as missing, not as zero demand, so an unrecorded month cannot pull the estimate down. The average is across recorded months only.",
     },
     {
       label: "Trend",
@@ -337,6 +383,7 @@ export function buildForecast(
     assumptions,
     notes: [
       ...notes,
+      "The month in progress is left out of the calculation because a part-finished month would understate the run rate.",
       sparse
         ? "Only a few months of history exist, so this estimate is a starting point rather than a reliable signal."
         : "Re-run the forecast after each delivery: the baseline updates as new demand is recorded.",

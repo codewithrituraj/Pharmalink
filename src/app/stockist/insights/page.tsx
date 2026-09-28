@@ -53,6 +53,7 @@ type ForecastPoint = {
   lower: number | null
   upper: number | null
   isForecast: boolean
+  hasRecord: boolean
 }
 
 type ForecastBlock = {
@@ -136,7 +137,11 @@ export default function InsightsPage() {
         value: point.actual,
         forecast: point.forecast,
         band: point.lower !== null && point.upper !== null ? { lower: point.lower, upper: point.upper } : null,
-        detail: point.isForecast ? "Modelled" : "Delivered",
+        detail: point.isForecast
+          ? "Modelled"
+          : point.hasRecord
+            ? "Delivered"
+            : "No orders recorded",
       })),
     [selected?.series],
   )

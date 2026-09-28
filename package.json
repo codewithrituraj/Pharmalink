@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test \"tests/**/*.test.ts\"",
+    "verify": "npm run typecheck && npm run lint && npm run test",
     "postinstall": "prisma skills sync || exit 0",
     "jobs:run": "tsx scripts/jobs-run.ts",
     "jobs:daemon": "tsx scripts/jobs-daemon.ts"

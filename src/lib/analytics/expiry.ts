@@ -195,6 +195,9 @@ export function buildExpiryReport(
 
   const byProduct = new Map<string, ExpiryBatchRecord[]>()
   for (const batch of batches) {
+    // A fully consumed batch holds no stock, so it must not appear as exposure
+    // or take up a FEFO position ahead of batches that still have units.
+    if (batch.quantity <= 0) continue
     const list = byProduct.get(batch.productId) ?? []
     list.push(batch)
     byProduct.set(batch.productId, list)

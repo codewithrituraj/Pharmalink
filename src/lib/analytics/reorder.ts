@@ -80,8 +80,15 @@ export function buildReorderRecommendation(
 
   const effectiveStock = input.onHand + input.onOrder
   const rawGap = targetStock - effectiveStock
-  const suggestedQuantity = Math.max(minOrderQty, roundUpToMultiple(rawGap, minOrderQty))
   const hasHistory = input.dailyConsumption !== null && input.dailyConsumption > 0
+  // Stock already covers the target, so there is nothing to buy. Without any
+  // history the minimum order quantity is still suggested, because that is the
+  // only sensible first order and it establishes the demand baseline.
+  const suggestedQuantity = hasHistory
+    ? rawGap > 0
+      ? Math.max(minOrderQty, roundUpToMultiple(rawGap, minOrderQty))
+      : 0
+    : minOrderQty
   const belowReorderPoint = reorderPoint !== null && effectiveStock <= reorderPoint
 
   let urgency: ReorderRecommendation["urgency"] = "MONITOR"
