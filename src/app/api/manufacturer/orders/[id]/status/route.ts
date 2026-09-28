@@ -4,9 +4,9 @@ import { z } from "zod"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { notify } from "@/lib/notifications"
+import { canTransition } from "@/lib/orders"
 
 const schema = z.object({ status: z.enum(["APPROVED", "PACKED", "DISPATCHED", "DELIVERED", "REJECTED"]) })
-const transitions: Record<string, string[]> = { PLACED: ["APPROVED", "REJECTED"], APPROVED: ["PACKED", "REJECTED"], PACKED: ["DISPATCHED"], DISPATCHED: ["DELIVERED"] }
 
 // These notifications are addressed to the buyer, so every link has to resolve
 // for a stockist. Delivered stock lands in inventory; everything else is a view
@@ -38,7 +38,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     },
   })
   if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 })
-  if (!transitions[order.status]?.includes(nextStatus)) {
+  if (!canTransition(order.status, nextStatus)) {
     return NextResponse.json({ error: `Cannot move ${order.status} to ${nextStatus}` }, { status: 409 })
   }
 

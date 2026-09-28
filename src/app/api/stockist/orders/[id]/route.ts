@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next"
 import { z } from "zod"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { canCancel } from "@/lib/orders"
 
 const actionSchema = z.object({ action: z.enum(["CANCEL", "REORDER"]) })
 
@@ -24,7 +25,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const order = await prisma.order.findFirst({ where: { id, buyerId: session.user.organizationId }, include: { items: { include: { allocations: true } } } })
   if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 })
   if (parsed.data.action === "REORDER") return NextResponse.json({ manufacturerId: order.sellerId, items: order.items.map((item) => ({ productId: item.productId, quantity: item.quantity })) })
-  if (!["PLACED", "APPROVED"].includes(order.status)) return NextResponse.json({ error: "This order can no longer be cancelled" }, { status: 409 })
+  if (!canCancel(order.status)) return NextResponse.json({ error: "This order can no longer be cancelled" }, { status: 409 })
   const updated = await prisma.$transaction(async (tx) => {
     // Release exactly the batches this order reserved.
     for (const item of order.items) {
