@@ -89,13 +89,30 @@ async function load(path: string, session: Session | null): Promise<number> {
   return res.status
 }
 
-/** Loads a page and returns its rendered HTML, for checking what it says. */
+/**
+ * Loads a page and returns the HTML it actually renders.
+ *
+ * The scripts are stripped first, because a page's RSC payload is inlined into
+ * the same document and carries the text of pages the browser has not navigated
+ * to yet. A check for a phrase against the raw response therefore matches text
+ * the user never sees, which is how a check for the 404 copy can pass on a page
+ * that is not the 404.
+ */
 async function html(path: string, session: Session | null): Promise<string> {
   const res = await fetch(`${base}${path}`, {
     headers: session ? { cookie: session.cookie } : {},
     redirect: "manual",
   })
-  return res.text()
+  return (await res.text()).replace(/<script[\s\S]*?<\/script>/g, "")
+}
+
+/** Loads a page and returns the status along with the rendered HTML. */
+async function page(path: string, session: Session | null): Promise<{ status: number; html: string }> {
+  const res = await fetch(`${base}${path}`, {
+    headers: session ? { cookie: session.cookie } : {},
+    redirect: "manual",
+  })
+  return { status: res.status, html: (await res.text()).replace(/<script[\s\S]*?<\/script>/g, "") }
 }
 
 /** A real order belonging to the seeded stockist, for the dynamic order page. */
@@ -247,6 +264,50 @@ describe("pages are not handed to the wrong role", () => {
       assert.equal(res.status, 307)
       assert.equal(res.headers.get("location"), `/${role}`)
     }
+  })
+})
+
+describe("an address that is not part of the app", () => {
+  const unknownPaths = ["/nonsense", "/stockist/nonsense", "/manufacturer/nope", "/admin/xyz"]
+
+  for (const path of unknownPaths) {
+    it(`${path} answers 404 with the app's own page`, async () => {
+      const { status, html: body } = await page(path, null)
+      assert.equal(status, 404, `${path} should be a 404, not a redirect or a 200`)
+      assert.ok(
+        body.includes("Nothing at this address"),
+        `${path} should render the app's 404 page, not Next's default one`,
+      )
+    })
+  }
+
+  it("offers a way back, and marks itself noindex", async () => {
+    const { html: body } = await page("/nonsense", null)
+    assert.ok(body.includes("Go to sign in"), "the 404 page should link somewhere useful")
+    assert.ok(body.includes("noindex"), "a 404 should not be indexed")
+  })
+
+  it("shows the same 404 whether signed in or not", async () => {
+    const out = await page("/stockist/nonsense", null)
+    const signedIn = await page("/stockist/nonsense", sessionFor("stockist"))
+    assert.equal(signedIn.status, 404)
+    assert.ok(
+      signedIn.html.includes("Nothing at this address"),
+      "a signed in visitor should get the same page, not a broken one",
+    )
+    assert.ok(out.html.includes("Nothing at this address"))
+  })
+
+  it("does not answer a 404 for a real page", async () => {
+    // The order page reads its own order and renders its own not-found card, so
+    // it must not be reached by the 404 page and it must stay a 200.
+    const { status, html: body } = await page("/stockist/orders/not-a-real-id", sessionFor("stockist"))
+    assert.equal(status, 200)
+    assert.ok(body.includes("Order not found"))
+    assert.ok(
+      !body.includes("Nothing at this address"),
+      "a stockist's mistyped order id should use the order page's own message",
+    )
   })
 })
 

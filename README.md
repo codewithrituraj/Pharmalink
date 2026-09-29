@@ -80,9 +80,10 @@ wrong caller: anonymous, a manufacturer against a stockist route, an admin
 against a stockist route, and a stockist against a manufacturer or admin route.
 A refusal is 401, 403, 404 or 400; a 2xx means the route answered someone it
 should have refused. The page suite loads all 18 pages as the role that owns
-each one, checks that the other two roles are turned away, and checks that a
-visitor with no session is sent to the login page. It needs a seeded database
-and a production build:
+each one, checks that the other two roles are turned away, checks that a visitor
+with no session is sent to the login page, and checks that an address matching no
+route answers 404 with the app's own page rather than Next's default. It needs a
+seeded database and a production build:
 
 ```bash
 npx prisma db seed
@@ -102,5 +103,24 @@ failures that look like application bugs. Keep it that way unless the suites are
 given databases of their own.
 
 The local SQLite database is `prisma/dev.db`. To reseed it manually, run `npx prisma db seed` after resetting or removing the local database.
+
+## When a page goes wrong
+
+Three files cover the failures a page can have, and they sit at different levels
+on purpose:
+
+- `src/app/not-found.tsx` answers any URL that matches no route. It renders
+  outside the layouts, so it cannot know who is signed in and shows the same page
+  to everyone. The stockist order page is not part of this: a mistyped or
+  cancelled order id renders an explanation and a 200, because that order is part
+  of the stockist's history and the order page is the right place to be.
+- `src/app/error.tsx` catches a page that threw while rendering, inside the
+  layouts and the app's own styling. In production the message a server
+  component threw is withheld on purpose, so the screen shows the `digest` that
+  matches the server log and offers a retry.
+- `src/app/global-error.tsx` is the one before it, for a failure in the root
+  layout itself, which a boundary does not catch. It replaces the root layout and
+  therefore renders its own document with inline styles, since the app's
+  stylesheet is not loaded at that level.
 
 Drug-license verification in this prototype is simulated and does not replace regulatory compliance or professional review.
