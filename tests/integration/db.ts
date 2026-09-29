@@ -62,3 +62,36 @@ export async function registerRivalStockist(base: string) {
 export async function disconnect() {
   await prisma.$disconnect()
 }
+
+/**
+ * Verifies a stockist's access to a manufacturer directly.
+ *
+ * The catalogue only lists products from manufacturers a stockist holds a
+ * VERIFIED grant for, so an organization registered a moment ago sees nothing
+ * and cannot place an order. That is correct behaviour, but it means an
+ * isolation test that compares a brand new organization against a seeded one
+ * has no rows on the new side to watch. Walking the request-and-approve flow is
+ * not what such a test is about, so the grant is written here instead.
+ */
+export async function grantAccess(email: string, manufacturerName: string) {
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { email },
+    select: { organizationId: true },
+  })
+  const manufacturer = await prisma.organization.findFirstOrThrow({
+    where: { name: manufacturerName, type: "MANUFACTURER" },
+    select: { id: true },
+  })
+  const stockistId = user.organizationId
+  if (!stockistId) {
+    throw new Error(`${email} belongs to no organization, so it cannot be granted access`)
+  }
+  await prisma.accessGrant.create({
+    data: {
+      stockistId,
+      manufacturerId: manufacturer.id,
+      status: "VERIFIED",
+      decidedAt: new Date(),
+    },
+  })
+}

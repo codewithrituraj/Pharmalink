@@ -72,14 +72,17 @@ npm run verify           # typecheck + lint + unit tests
 price and discount arithmetic, the order status machine, and the analytics
 forecasts. It needs nothing but the repository.
 
-`npm run test:integration` runs two suites against a real server. The order
+`npm run test:integration` runs three suites against a real server. The order
 lifecycle suite checks that the routes call those rules correctly, that one
 organization cannot read another's orders, and that cancelling puts stock back
 where it came from. The authorization suite probes all 27 API routes with the
 wrong caller: anonymous, a manufacturer against a stockist route, an admin
 against a stockist route, and a stockist against a manufacturer or admin route.
 A refusal is 401, 403, 404 or 400; a 2xx means the route answered someone it
-should have refused. It needs a seeded database and a production build:
+should have refused. The page suite loads all 18 pages as the role that owns
+each one, checks that the other two roles are turned away, and checks that a
+visitor with no session is sent to the login page. It needs a seeded database
+and a production build:
 
 ```bash
 npx prisma db seed

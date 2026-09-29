@@ -18,8 +18,8 @@
 import assert from "node:assert/strict"
 import { after, before, describe, it } from "node:test"
 
-import { api, signIn, type Session } from "./client"
-import { registerRivalStockist } from "./db"
+import { api, signIn, type CatalogueProduct, type PlacedOrder, type Session } from "./client"
+import { grantAccess, registerRivalStockist } from "./db"
 import { startServer, type TestServer } from "./server"
 
 type Probe = { path: string; method: string; body?: unknown }
@@ -82,9 +82,33 @@ let admin: Session
 let rival: Session
 
 /** How many ids appear in both lists, which is how a cross-tenant leak shows. */
-function overlap(a: { id: string }[] | undefined, b: { id: string }[] | undefined): number {
-  const seen = new Set((a ?? []).map((row) => row.id))
-  return (b ?? []).filter((row) => seen.has(row.id)).length
+function overlap(a: { id: string }[], b: { id: string }[]): number {
+  const seen = new Set(a.map((row) => row.id))
+  return b.filter((row) => seen.has(row.id)).length
+}
+
+/**
+ * Pulls the rows out of a response, insisting they are there.
+ *
+ * A leak check is only worth running on rows it can actually see. An earlier
+ * version of this file read `body.orders` off a response that turned out to be a
+ * bare array, so both sides were undefined, they overlapped in zero ids, and
+ * the test reported no leak while comparing nothing at all. A missing field and
+ * an empty field now fail loudly here instead of passing quietly.
+ */
+function requireRows(value: unknown, what: string): { id: string }[] {
+  assert.ok(
+    Array.isArray(value),
+    `expected a list for ${what}, got ${JSON.stringify(value ?? null).slice(0, 120)}`,
+  )
+  const list = value as { id: string }[]
+  assert.ok(list.length > 0, `${what} was empty, so the check would prove nothing`)
+  return list
+}
+
+/** Same, for a list nested under a key. */
+function rowsFrom(body: unknown, key: string): { id: string }[] {
+  return requireRows((body as Record<string, unknown>)[key], `body.${key}`)
 }
 
 /**
@@ -109,8 +133,51 @@ before(async () => {
     signIn(base, "mfr@apex.com"),
     signIn(base, "admin@pharmalink.com"),
   ])
-  rival = await signIn(base, await registerRivalStockist(base))
+  const rivalEmail = await registerRivalStockist(base)
+  rival = await signIn(base, rivalEmail)
+  await grantAccess(rivalEmail, "Apex Pharma")
+  await placeAndDeliver(stockist, "the seeded stockist")
+  await placeAndDeliver(rival, "the rival")
 })
+
+/**
+ * Gives an organization data of its own, so the isolation checks below have two
+ * non-empty lists to compare.
+ *
+ * A brand new organization has no orders, no inventory and no notifications, and
+ * the seeded stockist has no notifications either unless the scheduled jobs have
+ * run. Comparing either of them against the other proves nothing: an empty list
+ * overlaps an empty list in zero ids whether the routes are correctly scoped or
+ * leaking everything. So both sides place a real order and the manufacturer
+ * delivers it, which is the only path that creates rows in all three places at
+ * once. It uses the public routes, so the data arrives the way a customer's
+ * would.
+ */
+async function placeAndDeliver(session: Session, who: string) {
+  const search = await api<{ products: CatalogueProduct[] }>(base, session, "/api/stockist/search")
+  assert.equal(search.status, 200, `${who} should be able to search the catalogue`)
+  const product = (search.body.products ?? []).find((item) => (item.batches ?? []).length > 0)
+  assert.ok(product, `the seed should provide ${who} something to order`)
+
+  const placed = await api<PlacedOrder>(base, session, "/api/stockist/orders", {
+    method: "POST",
+    body: {
+      manufacturerId: product.manufacturerId,
+      items: [{ productId: product.id, quantity: Math.max(1, product.minOrderQty) }],
+    },
+  })
+  assert.equal(placed.status, 200, `${who} should be able to order: ${placed.body?.error}`)
+  const orderId = placed.body?.order?.id
+  assert.ok(orderId, `${who}'s order should have an id`)
+
+  for (const status of ["APPROVED", "PACKED", "DISPATCHED", "DELIVERED"]) {
+    const res = await api<{ error?: string }>(base, manufacturer, `/api/manufacturer/orders/${orderId}/status`, {
+      method: "PATCH",
+      body: { status },
+    })
+    assert.equal(res.status, 200, `delivering ${who}'s order at ${status}: ${res.body?.error}`)
+  }
+}
 
 after(async () => {
   await server?.stop()
@@ -175,36 +242,34 @@ describe("a stockist cannot use a manufacturer or admin route", () => {
 
 describe("a stockist cannot read another organization's data", () => {
   it("does not list another stockist's orders", async () => {
-    const mine = await api<{ orders: { id: string }[] }>(base, stockist, "/api/stockist/orders")
-    const theirs = await api<{ orders: { id: string }[] }>(base, rival, "/api/stockist/orders")
+    // This endpoint answers with a bare array, not a wrapper object, so the
+    // rows are read off the body itself.
+    const mine = await api<unknown>(base, stockist, "/api/stockist/orders")
+    const theirs = await api<unknown>(base, rival, "/api/stockist/orders")
     assert.equal(mine.status, 200)
     assert.equal(theirs.status, 200)
-    assert.equal(overlap(mine.body.orders, theirs.body.orders), 0, "two organizations saw the same orders")
+    assert.equal(
+      overlap(requireRows(mine.body, "orders"), requireRows(theirs.body, "orders")),
+      0,
+      "two organizations saw the same orders",
+    )
   })
 
   it("does not expose another stockist's inventory", async () => {
-    const mine = await api<{ batches: { id: string }[] }>(base, stockist, "/api/stockist/inventory")
-    const theirs = await api<{ batches: { id: string }[] }>(base, rival, "/api/stockist/inventory")
+    const mine = await api<unknown>(base, stockist, "/api/stockist/inventory")
+    const theirs = await api<unknown>(base, rival, "/api/stockist/inventory")
     assert.equal(
-      overlap(mine.body.batches, theirs.body.batches),
+      overlap(rowsFrom(mine.body, "batches"), rowsFrom(theirs.body, "batches")),
       0,
       "two organizations saw the same inventory batches",
     )
   })
 
   it("does not show another stockist's notifications", async () => {
-    const mine = await api<{ notifications: { id: string }[] }>(
-      base,
-      stockist,
-      "/api/stockist/notifications",
-    )
-    const theirs = await api<{ notifications: { id: string }[] }>(
-      base,
-      rival,
-      "/api/stockist/notifications",
-    )
+    const mine = await api<unknown>(base, stockist, "/api/stockist/notifications")
+    const theirs = await api<unknown>(base, rival, "/api/stockist/notifications")
     assert.equal(
-      overlap(mine.body.notifications, theirs.body.notifications),
+      overlap(rowsFrom(mine.body, "notifications"), rowsFrom(theirs.body, "notifications")),
       0,
       "two organizations saw the same notifications",
     )
