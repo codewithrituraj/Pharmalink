@@ -14,7 +14,9 @@ npx prisma db seed
 npm run dev
 ```
 
-Open http://localhost:3000. The development script uses Webpack because it is more reliable with the current Tailwind/PostCSS setup than the Turbopack CSS worker in this environment.
+Open http://localhost:3001. The port is pinned in the `dev` and `start` scripts rather than left at Next's default of 3000, because a VS Code Live Preview server commonly holds 127.0.0.1:3000 on this machine. Next binds the IPv6 loopback and that server holds the IPv4 one, so `localhost:3000` resolves to whichever answers first: sometimes the app, sometimes a directory listing. `NEXTAUTH_URL` in `.env.local` has to match the port, or sign-in fails with a callback URL mismatch.
+
+The development script uses Webpack because it is more reliable with the current Tailwind/PostCSS setup than the Turbopack CSS worker in this environment.
 
 ## Demo accounts
 
