@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { fetchJson } from "@/lib/client-fetch"
 
 type AccessGrant = {
   id: string
@@ -29,11 +30,10 @@ export default function AccessRequestsPage() {
 
   useEffect(() => {
     let mounted = true
-    fetch("/api/manufacturer/access")
-      .then((res) => res.json())
+    fetchJson<AccessGrant[]>("/api/manufacturer/access")
       .then((data) => {
         if (mounted) {
-          setGrants(data)
+          setGrants(data ?? [])
           setLoading(false)
         }
       })

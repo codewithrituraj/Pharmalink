@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { fetchJson } from "@/lib/client-fetch"
 
 type Order = { id: string; poNumber: string | null; createdAt: string; status: string; total: number; seller: { name: string }; items: { product: { name: string } }[] }
 const statuses = ["PLACED", "APPROVED", "PACKED", "DISPATCHED", "DELIVERED", "REJECTED", "CANCELLED"]
@@ -19,7 +20,18 @@ export default function OrdersPage() {
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   const [loading, setLoading] = useState(true)
-  useEffect(() => { fetch("/api/stockist/orders").then((response) => response.json()).then((data) => { setOrders(data); setLoading(false) }) }, [])
+  useEffect(() => {
+    let mounted = true
+    fetchJson<Order[]>("/api/stockist/orders").then((data) => {
+      if (mounted) {
+        setOrders(data ?? [])
+        setLoading(false)
+      }
+    })
+    return () => {
+      mounted = false
+    }
+  }, [])
   const filtered = useMemo(() => orders.filter((order) => {
     const date = new Date(order.createdAt)
     const text = `${order.poNumber} ${order.seller.name} ${order.items.map((item) => item.product.name).join(" ")}`.toLowerCase()

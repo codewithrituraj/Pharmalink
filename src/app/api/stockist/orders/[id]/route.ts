@@ -4,6 +4,7 @@ import { z } from "zod"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { canCancel } from "@/lib/orders"
+import { loadOrderForBuyer } from "@/lib/order-detail"
 
 const actionSchema = z.object({ action: z.enum(["CANCEL", "REORDER"]) })
 
@@ -11,7 +12,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const session = await getServerSession(authOptions)
   if (!session || session.user.role !== "STOCKIST" || !session.user.organizationId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const { id } = await params
-  const order = await prisma.order.findFirst({ where: { id, buyerId: session.user.organizationId }, include: { seller: true, items: { include: { product: true } }, audits: { orderBy: { createdAt: "asc" } } } })
+  // The same lookup the page uses, so a page can never show an order that this
+  // route would refuse.
+  const order = await loadOrderForBuyer(session.user.organizationId, id)
   if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 })
   return NextResponse.json(order)
 }

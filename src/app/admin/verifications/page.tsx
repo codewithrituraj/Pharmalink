@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { fetchJson } from "@/lib/client-fetch"
 
 type Organization = {
   id: string
@@ -27,11 +28,10 @@ export default function VerificationsPage() {
 
   useEffect(() => {
     let mounted = true
-    fetch("/api/admin/verify")
-      .then((res) => res.json())
+    fetchJson<Organization[]>("/api/admin/verify")
       .then((data) => {
         if (mounted) {
-          setOrgs(data)
+          setOrgs(data ?? [])
           setLoading(false)
         }
       })

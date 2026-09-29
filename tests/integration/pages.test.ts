@@ -15,7 +15,8 @@
 import assert from "node:assert/strict"
 import { after, before, describe, it } from "node:test"
 
-import { api, signIn, type Session } from "./client"
+import { api, signIn, type CatalogueProduct, type PlacedOrder, type Session } from "./client"
+import { grantAccess, registerRivalStockist } from "./db"
 import { startServer, type TestServer } from "./server"
 
 type Role = "stockist" | "manufacturer" | "admin"
@@ -26,6 +27,11 @@ let stockist: Session
 let manufacturer: Session
 let admin: Session
 let orderId: string
+let orderPoNumber: string
+
+/** A real order in another organization, to check the page will not show it. */
+let rivalOrderId: string
+let rivalPoNumber: string
 
 const stockistPages = [
   "/stockist",
@@ -83,13 +89,49 @@ async function load(path: string, session: Session | null): Promise<number> {
   return res.status
 }
 
+/** Loads a page and returns its rendered HTML, for checking what it says. */
+async function html(path: string, session: Session | null): Promise<string> {
+  const res = await fetch(`${base}${path}`, {
+    headers: session ? { cookie: session.cookie } : {},
+    redirect: "manual",
+  })
+  return res.text()
+}
+
 /** A real order belonging to the seeded stockist, for the dynamic order page. */
-async function anyOrderId(): Promise<string> {
+async function anyOrder(): Promise<{ id: string; poNumber: string | null }> {
   const res = await api<unknown[]>(base, stockist, "/api/stockist/orders")
   assert.equal(res.status, 200, `the stockist should be able to list orders: ${JSON.stringify(res.body)}`)
-  const first = res.body[0] as { id?: string } | undefined
+  const first = res.body[0] as { id?: string; poNumber?: string | null } | undefined
   assert.ok(first?.id, "the seed should give the stockist at least one order")
-  return first.id
+  return { id: first.id, poNumber: first.poNumber ?? null }
+}
+
+/**
+ * Places an order for a stockist in a different organization.
+ *
+ * The detail page reads the order on the server now, so whether it will refuse
+ * an id it does not own is decided before anything is rendered. That needs a
+ * genuine second organization's order to point at, not a made up id, which the
+ * page would reject for the wrong reason.
+ */
+async function placeOrderFor(email: string): Promise<{ id: string; poNumber: string | null }> {
+  const session = await signIn(base, email)
+  const search = await api<{ products: CatalogueProduct[] }>(base, session, "/api/stockist/search")
+  const product = (search.body.products ?? []).find((item) => (item.batches ?? []).length > 0)
+  assert.ok(product, `${email} should have something to order`)
+  const placed = await api<PlacedOrder>(base, session, "/api/stockist/orders", {
+    method: "POST",
+    body: {
+      manufacturerId: product.manufacturerId,
+      items: [{ productId: product.id, quantity: Math.max(1, product.minOrderQty) }],
+    },
+  })
+  assert.equal(placed.status, 200, `${email} should be able to order: ${placed.body?.error}`)
+  return {
+    id: placed.body.order.id,
+    poNumber: (placed.body.order as unknown as { poNumber?: string | null }).poNumber ?? null,
+  }
 }
 
 before(async () => {
@@ -100,7 +142,15 @@ before(async () => {
     signIn(base, "mfr@apex.com"),
     signIn(base, "admin@pharmalink.com"),
   ])
-  orderId = await anyOrderId()
+  const mine = await anyOrder()
+  orderId = mine.id
+  orderPoNumber = mine.poNumber ?? ""
+
+  const rivalEmail = await registerRivalStockist(base)
+  await grantAccess(rivalEmail, "Apex Pharma")
+  const theirs = await placeOrderFor(rivalEmail)
+  rivalOrderId = theirs.id
+  rivalPoNumber = theirs.poNumber ?? ""
 })
 
 after(async () => {
@@ -120,6 +170,49 @@ describe("pages answer the role that owns them", () => {
   it("/stockist/orders/[id] loads for a real order", async () => {
     const status = await load(`/stockist/orders/${orderId}`, sessionFor("stockist"))
     assert.equal(status, 200, "an order that exists should render")
+  })
+})
+
+describe("the order page answers 200 whatever the id is", () => {
+  it("shows the order when it is the stockist's own", async () => {
+    const body = await html(`/stockist/orders/${orderId}`, sessionFor("stockist"))
+    assert.ok(orderPoNumber.length > 0, "the seeded order should have a PO number")
+    assert.ok(
+      body.includes(orderPoNumber),
+      "the page should show the order it was asked for",
+    )
+  })
+
+  it("says so, and still answers 200, for an order that does not exist", async () => {
+    const missing = "/stockist/orders/00000000-0000-0000-0000-000000000000"
+    const status = await load(missing, sessionFor("stockist"))
+    assert.equal(status, 200, "a mistyped id is not a server error")
+    const body = await html(missing, sessionFor("stockist"))
+    assert.ok(
+      body.includes("Order not found"),
+      "the page should say the order is not there rather than crash",
+    )
+  })
+
+  it("says not found for an id that is not even an id", async () => {
+    const status = await load("/stockist/orders/not-a-real-id", sessionFor("stockist"))
+    assert.equal(status, 200)
+    const body = await html("/stockist/orders/not-a-real-id", sessionFor("stockist"))
+    assert.ok(body.includes("Order not found"))
+  })
+
+  it("will not show another organization's order", async () => {
+    const body = await html(`/stockist/orders/${rivalOrderId}`, sessionFor("stockist"))
+    assert.ok(
+      body.includes("Order not found"),
+      "an order belonging to another organization must read as not found",
+    )
+    if (rivalPoNumber.length > 0) {
+      assert.ok(
+        !body.includes(rivalPoNumber),
+        "the page leaked another organization's PO number",
+      )
+    }
   })
 })
 
