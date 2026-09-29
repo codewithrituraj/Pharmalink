@@ -31,7 +31,7 @@ export default function LoginPage() {
 
   const fillDemo = (email: string) => {
     setValue("email", email)
-    setValue("password", "password123")
+    setValue("password", "password@123")
     setError(null)
   }
 

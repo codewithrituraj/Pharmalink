@@ -18,7 +18,7 @@ Open http://localhost:3000. The development script uses Webpack because it is mo
 
 ## Demo accounts
 
-All demo accounts use `password123`.
+All demo accounts use `password@123`.
 
 | Role | Email |
 | --- | --- |
@@ -26,7 +26,7 @@ All demo accounts use `password123`.
 | Manufacturer | `mfr@apex.com` |
 | Stockist | `stockist@city.com` |
 
-Passwords are stored as scrypt hashes, so `password123` in the table above is the
+Passwords are stored as scrypt hashes, so `password@123` in the table above is the
 value you type, not what sits in the database. New accounts must choose at least
 8 characters and at most 128. Sign-in sets no minimum, so an account created
 under the old 6 character rule is not locked out by the change. The demo

@@ -35,7 +35,7 @@ export type CatalogueProduct = {
   batches: { id: string; expiryDate: string }[]
 }
 
-export async function signIn(base: string, email: string, password = "password123") {
+export async function signIn(base: string, email: string, password = "password@123") {
   const csrfRes = await fetch(`${base}/api/auth/csrf`)
   if (!csrfRes.ok) {
     throw new Error(`CSRF endpoint returned ${csrfRes.status} for ${email}`)

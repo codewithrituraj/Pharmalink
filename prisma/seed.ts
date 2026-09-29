@@ -4,7 +4,7 @@ import { hashPassword } from "../src/lib/password"
 
 const prisma = new PrismaClient()
 
-const DEMO_PASSWORD = "password123"
+const DEMO_PASSWORD = "password@123"
 
 const manufacturers = [
   { name: "Apex Pharma", prefix: "apex", drugLicense: "DL-APEX-123", gstNumber: "GST-APEX-123" },

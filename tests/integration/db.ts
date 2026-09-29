@@ -46,7 +46,7 @@ export async function registerRivalStockist(base: string) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       email,
-      password: "password123",
+      password: "password@123",
       organizationName: `Rival Pharmacy ${Date.now().toString(36)}`,
       type: "STOCKIST",
       drugLicense: `RIVAL-${Date.now().toString(36)}`,

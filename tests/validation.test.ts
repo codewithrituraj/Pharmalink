@@ -25,10 +25,10 @@ describe("password policy", () => {
   })
 
   it("keeps the documented demo password acceptable", () => {
-    // The README tells people to use password123, so a policy that rejects it
+    // The README tells people to use password@123, so a policy that rejects it
     // would contradict the documentation.
     assert.ok(
-      newPassword.safeParse("password123").success,
+      newPassword.safeParse("password@123").success,
       "the documented demo password must still pass the policy",
     )
   })
