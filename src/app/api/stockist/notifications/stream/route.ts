@@ -17,7 +17,7 @@ const MAX_TRACKED_IDS = 400
  */
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions)
-  if (!session?.user.organizationId) {
+  if (!session || session.user.role !== "STOCKIST" || !session.user.organizationId) {
     return new Response("Unauthorized", { status: 401 })
   }
 

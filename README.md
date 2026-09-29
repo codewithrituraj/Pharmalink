@@ -62,7 +62,7 @@ npm run build            # production compile and type-check
 npm run lint             # ESLint
 npm run typecheck        # TypeScript check
 npm test                 # unit tests, no server needed
-npm run test:integration # order lifecycle over HTTP, needs a build
+npm run test:integration # order lifecycle and access control, needs a build
 npm run verify           # typecheck + lint + unit tests
 ```
 
@@ -72,10 +72,14 @@ npm run verify           # typecheck + lint + unit tests
 price and discount arithmetic, the order status machine, and the analytics
 forecasts. It needs nothing but the repository.
 
-`npm run test:integration` runs the order lifecycle against a real server, which
-is the only way to check that the routes call those rules correctly, that one
+`npm run test:integration` runs two suites against a real server. The order
+lifecycle suite checks that the routes call those rules correctly, that one
 organization cannot read another's orders, and that cancelling puts stock back
-where it came from. It needs a seeded database and a production build:
+where it came from. The authorization suite probes all 27 API routes with the
+wrong caller: anonymous, a manufacturer against a stockist route, an admin
+against a stockist route, and a stockist against a manufacturer or admin route.
+A refusal is 401, 403, 404 or 400; a 2xx means the route answered someone it
+should have refused. It needs a seeded database and a production build:
 
 ```bash
 npx prisma db seed
@@ -87,6 +91,12 @@ The suite starts its own server on a free port and restores `prisma/dev.db`
 afterwards, including when a run fails, so your working copy is left as it was
 found. The dataset itself is not byte-for-byte reproducible between seeds, so
 compare a dump rather than a checksum if you need to check the restore.
+
+Because each suite owns that database outright, `test:integration` passes
+`--test-concurrency=1`. Node's test runner runs separate files in parallel by
+default, and two servers writing to one SQLite file at the same time produces
+failures that look like application bugs. Keep it that way unless the suites are
+given databases of their own.
 
 The local SQLite database is `prisma/dev.db`. To reseed it manually, run `npx prisma db seed` after resetting or removing the local database.
 

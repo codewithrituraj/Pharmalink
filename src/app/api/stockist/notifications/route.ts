@@ -17,7 +17,7 @@ const patchSchema = z.object({
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions)
-  if (!session?.user.organizationId) {
+  if (!session || session.user.role !== "STOCKIST" || !session.user.organizationId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
@@ -56,7 +56,7 @@ export async function GET(req: Request) {
 
 export async function PATCH(req: Request) {
   const session = await getServerSession(authOptions)
-  if (!session?.user.organizationId) {
+  if (!session || session.user.role !== "STOCKIST" || !session.user.organizationId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
