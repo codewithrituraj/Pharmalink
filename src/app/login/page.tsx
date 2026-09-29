@@ -13,10 +13,9 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import Link from "next/link"
 import { ArrowRight, Building2, ShieldCheck, Stethoscope } from "lucide-react"
 
-const loginSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-})
+import { signInSchema } from "@/lib/validation"
+
+const loginSchema = signInSchema
 
 export default function LoginPage() {
   const router = useRouter()

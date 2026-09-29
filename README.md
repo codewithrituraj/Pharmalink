@@ -27,9 +27,11 @@ All demo accounts use `password123`.
 | Stockist | `stockist@city.com` |
 
 Passwords are stored as scrypt hashes, so `password123` in the table above is the
-value you type, not what sits in the database. The demo password is deliberately
-weak and public: replace it, and raise the sign-up minimum, before this is
-exposed to anyone.
+value you type, not what sits in the database. New accounts must choose at least
+8 characters and at most 128. Sign-in sets no minimum, so an account created
+under the old 6 character rule is not locked out by the change. The demo
+password is deliberately weak and public: replace it before this is exposed to
+anyone.
 
 ## Where to edit what
 

@@ -7,18 +7,11 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Button } from "@/components/ui/button"
 
+import { registerSchema } from "@/lib/validation"
+
 import { Input } from "@/components/ui/input"
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card"
 import Link from "next/link"
-
-const registerSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-  organizationName: z.string().min(2, "Company name is required"),
-  type: z.enum(["MANUFACTURER", "STOCKIST"]),
-  drugLicense: z.string().min(1, "Drug License is required"),
-  gstNumber: z.string().min(1, "GST Number is required"),
-})
 
 export default function RegisterPage() {
   const router = useRouter()
