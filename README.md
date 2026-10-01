@@ -14,7 +14,11 @@ npx prisma db seed
 npm run dev
 ```
 
-Open http://localhost:3001. The port is pinned in the `dev` and `start` scripts rather than left at Next's default of 3000, because a VS Code Live Preview server commonly holds 127.0.0.1:3000 on this machine. Next binds the IPv6 loopback and that server holds the IPv4 one, so `localhost:3000` resolves to whichever answers first: sometimes the app, sometimes a directory listing. `NEXTAUTH_URL` in `.env.local` has to match the port, or sign-in fails with a callback URL mismatch.
+Open http://127.0.0.1:4321. Use the full address, not `localhost`: the app binds IPv4 explicitly, so `localhost` only reaches it when the resolver happens to try IPv4 first.
+
+The port and host are pinned in the `dev` and `start` scripts because of a collision on this machine. VS Code's port-forwarding and Live Preview helper holds `127.0.0.1` on 3000, 3001, 5000, 5173, 5174, 7000, 7768, 8000, 8001 and 8888. Next binds the IPv6 loopback only, so the two servers end up listening on the same port number in different address families, and `localhost:<port>` goes to whichever answers first — sometimes the app, sometimes a VS Code tunnel answering `426 Upgrade Required`, which reads as a broken server. Binding IPv4 on a port VS Code does not hold removes both failure modes.
+
+`NEXTAUTH_URL` in `.env.local` must match the host and port in the browser, or sign-in fails on a callback URL mismatch.
 
 The development script uses Webpack because it is more reliable with the current Tailwind/PostCSS setup than the Turbopack CSS worker in this environment.
 
