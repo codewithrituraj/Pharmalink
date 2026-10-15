@@ -63,11 +63,37 @@ export const authOptions: NextAuthOptions = {
         token.role = user.role
         token.organizationId = user.organizationId
         token.organizationType = user.organizationType
+      } else if (token.email) {
+        // JWT sessions can outlive a local demo reseed. Reconcile the signed
+        // identity with the database so an obsolete organization id cannot
+        // silently turn every page into an empty account. In production a
+        // deleted user is invalidated; email recovery is deliberately limited
+        // to the local demo where the seed recreates the documented accounts.
+        const current = await prisma.user.findUnique({
+          where: { email: token.email },
+          include: { organization: true },
+        })
+        const sameIdentity = current?.id === token.id
+        const mayRecoverSeededDemo = process.env.NODE_ENV !== "production"
+
+        if (current && (sameIdentity || mayRecoverSeededDemo)) {
+          token.id = current.id
+          token.role = current.role
+          token.organizationId = current.organizationId
+          token.organizationType = current.organization?.type
+          token.authError = current.isSuspended ? "ACCOUNT_SUSPENDED" : undefined
+        } else {
+          token.authError = "ACCOUNT_NOT_FOUND"
+          token.id = undefined
+          token.role = undefined
+          token.organizationId = undefined
+          token.organizationType = undefined
+        }
       }
       return token
     },
     async session({ session, token }) {
-      if (token) {
+      if (token && !token.authError) {
         session.user.id = token.id as string
         session.user.role = token.role as string
         session.user.organizationId = token.organizationId as string

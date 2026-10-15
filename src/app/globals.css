@@ -49,6 +49,8 @@
 }
 
 :root {
+  --font-geist-sans: Arial, Helvetica, sans-serif;
+  --font-geist-mono: "SFMono-Regular", Consolas, monospace;
   --background: oklch(0.975 0.012 170);
   --foreground: oklch(0.22 0.035 220);
   --card: oklch(1 0 0);
@@ -123,11 +125,15 @@
   }
   body {
     @apply bg-background text-foreground;
+    max-width: 100%;
+    overflow-x: clip;
     background-image: radial-gradient(circle at 90% 0%, oklch(0.94 0.05 175 / 0.8), transparent 32rem), linear-gradient(135deg, oklch(0.98 0.01 180), oklch(0.96 0.02 210));
     background-attachment: fixed;
   }
   html {
     @apply font-sans;
+    max-width: 100%;
+    overflow-x: clip;
   }
 
   button,
@@ -136,6 +142,10 @@
   select,
   textarea {
     -webkit-tap-highlight-color: transparent;
+  }
+
+  input[type="file"].sr-only {
+    display: none !important;
   }
 }
 

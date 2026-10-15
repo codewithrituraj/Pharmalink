@@ -1,21 +1,22 @@
-import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
-import { redirect } from "next/navigation"
+import Link from "next/link"
+import { ArrowRight, BadgeIndianRupee, Boxes, Building2, CalendarClock, CheckCircle2, ShieldCheck, Sparkles, Stethoscope } from "lucide-react"
+import { DemoEntryButton } from "@/components/demo-entry-button"
+import { buttonVariants } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
-export default async function Home() {
-  const session = await getServerSession(authOptions)
+const problems = [
+  { icon: Building2, title: "All approved suppliers in one place", copy: "Stop switching between calls, WhatsApp lists and spreadsheets to compare authorised catalogues." },
+  { icon: Boxes, title: "Reorder before shelves run dry", copy: "Use delivered demand, current batch stock and supplier lead time to size the next purchase order." },
+  { icon: CalendarClock, title: "Act before a batch expires", copy: "See FEFO risk early and open a prefilled return request for the exact batch." },
+  { icon: BadgeIndianRupee, title: "Keep invoices and dues visible", copy: "Track tax invoices, payment submissions, credit notes and ageing without a separate manual ledger." },
+]
 
-  if (!session) {
-    redirect("/login")
-  }
-
-  if (session.user.role === "ADMIN") {
-    redirect("/admin")
-  } else if (session.user.role === "MANUFACTURER") {
-    redirect("/manufacturer")
-  } else if (session.user.role === "STOCKIST") {
-    redirect("/stockist")
-  } else {
-    redirect("/login")
-  }
+export default function Home() {
+  return <main className="min-h-screen bg-background text-foreground">
+    <header className="border-b border-border/70 bg-background/90 px-5 py-4 backdrop-blur sm:px-8"><div className="mx-auto flex max-w-7xl items-center justify-between gap-4"><Link href="/" className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-primary text-primary-foreground"><Stethoscope className="size-5" /></span><span className="text-xl font-bold tracking-tight">PharmaLink</span></Link><div className="flex items-center gap-2"><Link href="/login" className={cn(buttonVariants({ variant: "ghost" }), "min-h-11")}>Sign in</Link><Link href="/register" className={cn(buttonVariants(), "hidden min-h-11 sm:inline-flex")}>Create real account</Link></div></div></header>
+    <section className="overflow-hidden px-5 py-16 sm:px-8 lg:py-24"><div className="mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[1.08fr_0.92fr]"><div><p className="eyebrow">Built for Indian pharmaceutical stockists</p><h1 className="mt-4 max-w-3xl text-4xl font-semibold leading-tight tracking-tight sm:text-6xl">Know what to order, what may expire, and what is still unpaid.</h1><p className="mt-6 max-w-2xl text-lg leading-8 text-muted-foreground">PharmaLink brings approved supplier catalogues, purchase orders, batch stock, expiry returns, GST invoices and outstanding payments into one daily workspace.</p><div className="mt-8 flex flex-col gap-3 sm:flex-row"><DemoEntryButton /><Link href="/register" className={cn(buttonVariants({ variant: "outline" }), "min-h-12 px-6")}>Create real account <ArrowRight className="size-4" /></Link></div><p className="mt-3 text-xs text-muted-foreground">The demo uses seeded sample data. It never exposes a real business account.</p></div><div className="rounded-3xl border border-border/70 bg-[linear-gradient(145deg,oklch(0.23_0.06_220),oklch(0.35_0.1_177))] p-5 text-white shadow-2xl sm:p-8"><div className="flex items-center justify-between"><div><p className="text-sm text-emerald-200">Today&apos;s decisions</p><p className="mt-1 text-2xl font-semibold">4 actions need attention</p></div><Sparkles className="size-6 text-emerald-200" /></div><div className="mt-6 space-y-3">{["Reorder 240 units before projected stock-out", "Return batch APX-2407 before expiry", "Review 2 unpaid tax invoices", "Follow up on a delayed dispatch"].map((text, index) => <div key={text} className="flex items-start gap-3 rounded-xl bg-white/10 p-4"><span className="grid size-7 shrink-0 place-items-center rounded-full bg-emerald-300 text-xs font-bold text-slate-900">{index + 1}</span><p className="text-sm leading-6 text-white/85">{text}</p></div>)}</div><div className="mt-5 flex items-center gap-2 text-xs text-white/60"><ShieldCheck className="size-4 text-emerald-200" /> Drug-licence status, GST and traceable order history stay visible.</div></div></div></section>
+    <section className="border-y border-border/70 bg-muted/35 px-5 py-16 sm:px-8"><div className="mx-auto max-w-7xl"><p className="eyebrow">Replace daily guesswork</p><h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight">One connected workflow, from stock decision to payment closure.</h2><div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">{problems.map(({ icon: Icon, title, copy }) => <article key={title} className="rounded-2xl border border-border/70 bg-card p-6 shadow-sm"><Icon className="size-6 text-primary" /><h3 className="mt-5 font-semibold">{title}</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">{copy}</p></article>)}</div></div></section>
+    <section className="px-5 py-16 sm:px-8"><div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-2"><div><p className="eyebrow">Made for accountable trade</p><h2 className="mt-3 text-3xl font-semibold tracking-tight">The numbers are tied to actual records.</h2><p className="mt-4 max-w-xl leading-7 text-muted-foreground">Recommendations use delivered orders, on-hand batches, FEFO exposure and supplier lead time. Empty history produces an honest “building up” state—not a fabricated forecast.</p></div><div className="grid gap-3">{["Verified organization and manufacturer licence status", "GST details on supplier records and tax invoices", "Batch allocation, expiry and order audit history", "Explanations beside forecasts and reorder quantities"].map(item => <div key={item} className="flex items-center gap-3 rounded-xl border border-border/70 p-4 text-sm font-medium"><CheckCircle2 className="size-5 shrink-0 text-emerald-600" />{item}</div>)}</div></div></section>
+    <footer className="border-t border-border/70 px-5 py-8 text-sm text-muted-foreground sm:px-8"><div className="mx-auto flex max-w-7xl flex-col justify-between gap-4 sm:flex-row"><p>PharmaLink · Pharmaceutical procurement and stock decisions</p><div className="flex gap-5"><Link href="/data-handling" className="hover:text-foreground">How we handle your data</Link><Link href="/login" className="hover:text-foreground">Sign in</Link></div></div></footer>
+  </main>
 }

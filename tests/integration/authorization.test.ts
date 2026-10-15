@@ -33,10 +33,13 @@ const stockistRoutes: Probe[] = [
   { path: "/api/stockist/drafts", method: "POST", body: {} },
   { path: "/api/stockist/expiry", method: "GET" },
   { path: "/api/stockist/favourites", method: "GET" },
+  { path: "/api/stockist/h1-register", method: "GET" },
   { path: "/api/stockist/insights", method: "GET" },
   { path: "/api/stockist/insights/forecast", method: "GET" },
   { path: "/api/stockist/inventory", method: "GET" },
   { path: "/api/stockist/inventory", method: "POST", body: {} },
+  { path: "/api/stockist/invoices", method: "GET" },
+  { path: "/api/stockist/ledger", method: "GET" },
   { path: `/api/stockist/inventory/${SOME_ID}`, method: "PATCH", body: { quantity: 1 } },
   { path: `/api/stockist/inventory/${SOME_ID}`, method: "DELETE" },
   { path: "/api/stockist/manufacturers", method: "GET" },
@@ -53,6 +56,8 @@ const stockistRoutes: Probe[] = [
   { path: `/api/stockist/products/${SOME_ID}/favourite`, method: "POST" },
   { path: "/api/stockist/reorder", method: "GET" },
   { path: "/api/stockist/reorder", method: "POST", body: {} },
+  { path: "/api/stockist/returns", method: "GET" },
+  { path: "/api/stockist/returns", method: "POST", body: {} },
   { path: "/api/stockist/search", method: "GET" },
 ]
 
@@ -60,10 +65,25 @@ const manufacturerRoutes: Probe[] = [
   { path: "/api/manufacturer/access", method: "GET" },
   { path: "/api/manufacturer/access", method: "POST", body: {} },
   { path: "/api/manufacturer/catalogue", method: "POST", body: {} },
+  { path: "/api/manufacturer/orders", method: "GET" },
+  { path: "/api/manufacturer/payments", method: "GET" },
+  { path: "/api/manufacturer/payments", method: "PATCH", body: {} },
+  { path: "/api/manufacturer/products", method: "GET" },
+  { path: "/api/manufacturer/products", method: "POST", body: {} },
+  { path: "/api/manufacturer/reports", method: "GET" },
+  { path: "/api/manufacturer/returns", method: "GET" },
+  { path: "/api/manufacturer/returns", method: "PATCH", body: {} },
+  { path: "/api/manufacturer/schemes", method: "GET" },
+  { path: "/api/manufacturer/schemes", method: "POST", body: {} },
   { path: `/api/manufacturer/orders/${SOME_ID}/status`, method: "PATCH", body: { status: "APPROVED" } },
 ]
 
 const adminRoutes: Probe[] = [
+  { path: "/api/admin/audit", method: "GET" },
+  { path: "/api/admin/compliance", method: "GET" },
+  { path: "/api/admin/h1-register", method: "GET" },
+  { path: "/api/admin/users", method: "GET" },
+  { path: "/api/admin/users", method: "PATCH", body: {} },
   { path: "/api/admin/verify", method: "GET" },
   { path: "/api/admin/verify", method: "POST", body: {} },
   { path: "/api/jobs/runs", method: "GET" },
@@ -173,7 +193,7 @@ async function placeAndDeliver(session: Session, who: string) {
   for (const status of ["APPROVED", "PACKED", "DISPATCHED", "DELIVERED"]) {
     const res = await api<{ error?: string }>(base, manufacturer, `/api/manufacturer/orders/${orderId}/status`, {
       method: "PATCH",
-      body: { status },
+      body: status === "DISPATCHED" ? { status, transporter: "Integration Logistics", trackingNumber: `INT-${orderId.slice(-8)}` } : { status },
     })
     assert.equal(res.status, 200, `delivering ${who}'s order at ${status}: ${res.body?.error}`)
   }
@@ -273,5 +293,16 @@ describe("a stockist cannot read another organization's data", () => {
       0,
       "two organizations saw the same notifications",
     )
+  })
+})
+
+describe("admin user data is safe to return to the browser", () => {
+  it("never serializes password hashes", async () => {
+    const response = await api<Record<string, unknown>[]>(base, admin, "/api/admin/users")
+    assert.equal(response.status, 200)
+    assert.ok(response.body.length > 0, "the seeded user list should not be empty")
+    for (const user of response.body) {
+      assert.equal("password" in user, false, `password material leaked for ${String(user.email)}`)
+    }
   })
 })

@@ -15,6 +15,9 @@ model User {
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id])
   favourites     Favourite[]
+  isSuspended    Boolean       @default(false)
+  auditEvents    AuditLog[]    @relation("ActorAuditEvents")
+  paymentReviews PaymentSubmission[] @relation("PaymentReviewer")
 }
 
 model Organization {
@@ -24,6 +27,9 @@ model Organization {
   drugLicense        String?
   gstNumber          String?
   region             String?
+  address            String?
+  verificationRemark String?
+  documents          VerificationDocument[]
   status             String           @default("PENDING") // PENDING, REVIEW, VERIFIED, REJECTED
   users              User[]
   products           Product[]
@@ -37,6 +43,17 @@ model Organization {
   inventoryBatches   InventoryBatch[]
   demandSamples      DemandSample[]
   jobRuns            JobRun[]
+  auditEvents        AuditLog[] @relation("OrganizationAuditEvents")
+  returnRequests     ReturnRequest[] @relation("BuyerReturns")
+  returnsReceived    ReturnRequest[] @relation("SellerReturns")
+  complianceViolations ProductPriceViolation[] @relation("ViolationManufacturer")
+  h1RegisterEntries H1RegisterEntry[] @relation("H1RegisterBuyer")
+  traceVerifications TraceVerificationLog[] @relation("TraceStockist")
+  marketplaceListings MarketplaceListing[] @relation("ListingSeller")
+  swapOrdersAsBuyer SwapOrder[] @relation("SwapBuyer")
+  swapOrdersAsSeller SwapOrder[] @relation("SwapSeller")
+  paymentSubmissionsAsStockist PaymentSubmission[] @relation("PaymentStockist")
+  paymentSubmissionsAsManufacturer PaymentSubmission[] @relation("PaymentManufacturer")
 }
 
 model AccessGrant {
@@ -47,6 +64,7 @@ model AccessGrant {
   message        String?
   requestedAt    DateTime     @default(now())
   decidedAt      DateTime?
+  customDiscount Float?
   manufacturer   Organization @relation("ManufacturerGrants", fields: [manufacturerId], references: [id])
   stockist       Organization @relation("StockistGrants", fields: [stockistId], references: [id])
 }
@@ -73,12 +91,15 @@ model Product {
   manufacturerId   String
   name             String
   genericName      String
+  composition      String           @default("")
   category         String           @default("General")
   dosageForm       String           @default("Tablet")
   strength         String           @default("")
   packSize         String           @default("10 x 10")
   gstPercent       Float            @default(12)
   isPrescription   Boolean          @default(false)
+  isScheduleH1     Boolean          @default(false)
+  requiresColdChain Boolean         @default(false)
   storage          String           @default("Store below 25 C")
   minOrderQty      Int              @default(1)
   leadTimeDays     Int              @default(7)
@@ -86,6 +107,9 @@ model Product {
   ptr              Float
   pts              Float
   isActive         Boolean          @default(true)
+  availability     Int              @default(0)
+  imageUrl         String?
+  hsnCode          String           @default("3004")
   batches          Batch[]
   schemes          Scheme[]
   manufacturer     Organization     @relation(fields: [manufacturerId], references: [id])
@@ -94,6 +118,11 @@ model Product {
   draftItems       CartDraftItem[]
   inventoryBatches InventoryBatch[]
   demandSamples    DemandSample[]
+  returnItems      ReturnItem[]
+  complianceViolations ProductPriceViolation[]
+  h1RegisterEntries H1RegisterEntry[]
+  marketplaceListings MarketplaceListing[]
+  swapOrders       SwapOrder[]
 }
 
 model Favourite {
@@ -115,6 +144,7 @@ model Scheme {
   minQuantity     Int      @default(1)
   discountPercent Float    @default(0)
   freeQuantity    Int      @default(0)
+  stockistId      String?
   validFrom       DateTime
   validUntil      DateTime
   product         Product  @relation(fields: [productId], references: [id])
@@ -127,8 +157,10 @@ model Batch {
   quantity    Int
   mfgDate     DateTime
   expiryDate  DateTime
+  qrCode      String?               @unique
   product     Product               @relation(fields: [productId], references: [id])
   allocations OrderItemAllocation[]
+  traceLogs   TraceVerificationLog[]
 }
 
 model InventoryBatch {
@@ -144,6 +176,8 @@ model InventoryBatch {
   stockist      Organization @relation(fields: [stockistId], references: [id])
   product       Product      @relation(fields: [productId], references: [id])
   sourceOrder   Order?       @relation(fields: [sourceOrderId], references: [id])
+  returnItems   ReturnItem[]
+  marketplaceListings MarketplaceListing[]
 
   @@index([stockistId, productId])
   @@index([stockistId, expiryDate])
@@ -174,12 +208,23 @@ model Order {
   notes            String?
   transporter      String?
   trackingNumber   String?
+  expectedDelivery DateTime?
   invoiceNumber    String?
+  invoiceCreatedAt DateTime?
   poNumber         String?
+  isPaid           Boolean          @default(false)
+  paidAt           DateTime?
+  paymentRef       String?
+  paymentStatus    String           @default("UNPAID") // UNPAID, SUBMITTED, PARTIALLY_PAID, PAID, REJECTED
+  paidAmount       Float            @default(0)
   createdAt        DateTime         @default(now())
   items            OrderItem[]
   audits           OrderAudit[]
   inventoryBatches InventoryBatch[]
+  returnRequests   ReturnRequest[]
+  h1RegisterEntries H1RegisterEntry[]
+  traceVerifications TraceVerificationLog[]
+  paymentSubmissions PaymentSubmission[]
   buyer            Organization     @relation("BuyerOrders", fields: [buyerId], references: [id])
   seller           Organization     @relation("SellerOrders", fields: [sellerId], references: [id])
 }
@@ -220,9 +265,11 @@ model OrderItem {
   productId   String
   quantity    Int
   price       Float
+  freeQuantity Int                  @default(0)
   order       Order                 @relation(fields: [orderId], references: [id])
   product     Product               @relation(fields: [productId], references: [id])
   allocations OrderItemAllocation[]
+  h1RegisterEntry H1RegisterEntry?
 }
 
 model OrderItemAllocation {
@@ -252,4 +299,199 @@ model JobRun {
   organizationId String?
 
   @@index([job, startedAt])
+}
+
+model VerificationDocument {
+  id             String       @id @default(cuid())
+  organizationId String
+  name           String
+  mimeType       String
+  size           Int
+  path           String
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+}
+
+model AuditLog {
+  id             String        @id @default(cuid())
+  actorId        String?
+  organizationId String?
+  action         String
+  entityType     String
+  entityId       String
+  detail         String?
+  createdAt      DateTime      @default(now())
+  actor          User?         @relation("ActorAuditEvents", fields: [actorId], references: [id])
+  organization   Organization? @relation("OrganizationAuditEvents", fields: [organizationId], references: [id])
+
+  @@index([createdAt])
+  @@index([organizationId, createdAt])
+}
+
+model ReturnRequest {
+  id          String       @id @default(cuid())
+  orderId     String?
+  buyerId     String
+  sellerId    String
+  reason      String
+  status      String       @default("REQUESTED") // REQUESTED, APPROVED, REJECTED, CREDITED
+  remark      String?
+  creditNote  String?
+  creditNoteCreatedAt DateTime?
+  total       Float        @default(0)
+  createdAt   DateTime     @default(now())
+  decidedAt   DateTime?
+  order       Order?       @relation(fields: [orderId], references: [id])
+  buyer       Organization @relation("BuyerReturns", fields: [buyerId], references: [id])
+  seller      Organization @relation("SellerReturns", fields: [sellerId], references: [id])
+  items       ReturnItem[]
+
+  @@index([buyerId, createdAt])
+  @@index([sellerId, createdAt])
+}
+
+model ReturnItem {
+  id              String        @id @default(cuid())
+  returnRequestId String
+  inventoryBatchId String?
+  productId       String
+  quantity        Int
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id])
+  inventoryBatch  InventoryBatch? @relation(fields: [inventoryBatchId], references: [id])
+  product         Product       @relation(fields: [productId], references: [id])
+}
+
+model NppaCeilingPrice {
+  id            String                 @id @default(cuid())
+  drugName      String
+  composition   String
+  packSize      String
+  ceilingPrice  Float
+  effectiveDate DateTime
+  createdAt     DateTime               @default(now())
+  violations    ProductPriceViolation[]
+
+  @@unique([composition, packSize, effectiveDate])
+  @@index([composition, packSize, effectiveDate])
+}
+
+model ProductPriceViolation {
+  id             String           @id @default(cuid())
+  productId      String
+  manufacturerId String
+  referenceId    String
+  submittedMrp   Float
+  ceilingPrice   Float
+  detectedAt     DateTime         @default(now())
+  resolvedAt     DateTime?
+  active         Boolean          @default(true)
+  product        Product          @relation(fields: [productId], references: [id])
+  manufacturer   Organization     @relation("ViolationManufacturer", fields: [manufacturerId], references: [id])
+  reference      NppaCeilingPrice @relation(fields: [referenceId], references: [id])
+
+  @@unique([productId, referenceId])
+  @@index([active, detectedAt])
+}
+
+model H1RegisterEntry {
+  id                           String       @id @default(cuid())
+  orderId                      String
+  orderItemId                  String       @unique
+  productId                    String
+  buyerId                      String
+  buyerName                    String
+  patientName                  String
+  prescriberName               String
+  prescriberRegistrationNumber String
+  quantity                     Int
+  createdAt                    DateTime     @default(now())
+  order                        Order        @relation(fields: [orderId], references: [id])
+  orderItem                    OrderItem    @relation(fields: [orderItemId], references: [id])
+  product                      Product      @relation(fields: [productId], references: [id])
+  buyer                        Organization @relation("H1RegisterBuyer", fields: [buyerId], references: [id])
+
+  @@index([createdAt, productId])
+  @@index([buyerId, createdAt])
+}
+
+model TraceVerificationLog {
+  id            String       @id @default(cuid())
+  stockistId    String
+  orderId       String
+  batchId       String?
+  submittedCode String
+  matched       Boolean
+  details       String?
+  createdAt     DateTime     @default(now())
+  stockist      Organization @relation("TraceStockist", fields: [stockistId], references: [id])
+  order         Order        @relation(fields: [orderId], references: [id])
+  batch         Batch?       @relation(fields: [batchId], references: [id])
+
+  @@index([orderId, createdAt])
+  @@index([matched, createdAt])
+}
+
+model MarketplaceListing {
+  id               String          @id @default(cuid())
+  sellerId         String
+  inventoryBatchId String
+  productId        String
+  quantity         Int
+  pricePerUnit     Float
+  status           String          @default("ACTIVE") // ACTIVE, EXHAUSTED, DELISTED, EXPIRED
+  expiresAt        DateTime
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  seller           Organization    @relation("ListingSeller", fields: [sellerId], references: [id])
+  inventoryBatch   InventoryBatch  @relation(fields: [inventoryBatchId], references: [id])
+  product          Product         @relation(fields: [productId], references: [id])
+  orders           SwapOrder[]
+
+  @@index([status, expiresAt])
+  @@index([sellerId, status])
+}
+
+model SwapOrder {
+  id           String            @id @default(cuid())
+  listingId    String
+  buyerId      String
+  sellerId     String
+  productId    String
+  quantity     Int
+  pricePerUnit Float
+  total        Float
+  status       String            @default("ORDERED") // ORDERED, SHIPPED, DELIVERED, CANCELLED
+  createdAt    DateTime          @default(now())
+  shippedAt    DateTime?
+  deliveredAt  DateTime?
+  listing      MarketplaceListing @relation(fields: [listingId], references: [id])
+  buyer        Organization      @relation("SwapBuyer", fields: [buyerId], references: [id])
+  seller       Organization      @relation("SwapSeller", fields: [sellerId], references: [id])
+  product      Product           @relation(fields: [productId], references: [id])
+
+  @@index([buyerId, createdAt])
+  @@index([sellerId, createdAt])
+}
+
+model PaymentSubmission {
+  id             String       @id @default(cuid())
+  orderId        String
+  stockistId     String
+  manufacturerId String
+  amount         Float
+  reference      String
+  status         String       @default("SUBMITTED") // SUBMITTED, CONFIRMED, REJECTED
+  submittedAt    DateTime     @default(now())
+  reviewedAt     DateTime?
+  reviewerUserId String?
+  reviewNote     String?
+  order          Order        @relation(fields: [orderId], references: [id])
+  stockist       Organization @relation("PaymentStockist", fields: [stockistId], references: [id])
+  manufacturer   Organization @relation("PaymentManufacturer", fields: [manufacturerId], references: [id])
+  reviewer       User?        @relation("PaymentReviewer", fields: [reviewerUserId], references: [id])
+
+  @@index([manufacturerId, status, submittedAt])
+  @@index([stockistId, submittedAt])
 }

@@ -43,6 +43,8 @@ export async function GET(req: Request) {
           name: true,
           genericName: true,
           category: true,
+          strength: true,
+          packSize: true,
           ptr: true,
           minOrderQty: true,
           leadTimeDays: true,
@@ -63,6 +65,9 @@ export async function GET(req: Request) {
       id: batch.id,
       productId: batch.productId,
       productName: batch.product.name,
+      brand: batch.product.manufacturer.name,
+      strength: batch.product.strength,
+      packSize: batch.product.packSize,
       genericName: batch.product.genericName,
       category: batch.product.category,
       manufacturerName: batch.product.manufacturer.name,
@@ -83,6 +88,7 @@ export async function GET(req: Request) {
               ? "WATCH"
               : "OK",
       source: batch.sourceOrderId ? "DELIVERY" : "MANUAL",
+      sourceOrderId: batch.sourceOrderId,
       sourceOrder: batch.sourceOrder
         ? {
             id: batch.sourceOrder.id,
@@ -117,6 +123,34 @@ export async function GET(req: Request) {
     )
   }
 
+  const expiringSoon = serialized.filter(
+    (batch) => batch.daysRemaining > 0 && batch.daysRemaining <= 90,
+  ).length
+  const daysCover = [
+    { bucket: "≤30d", units: serialized.filter((batch) => batch.daysRemaining > 0 && batch.daysRemaining <= 30).reduce((sum, batch) => sum + batch.quantity, 0) },
+    { bucket: "31–60d", units: serialized.filter((batch) => batch.daysRemaining > 30 && batch.daysRemaining <= 60).reduce((sum, batch) => sum + batch.quantity, 0) },
+    { bucket: "61–90d", units: serialized.filter((batch) => batch.daysRemaining > 60 && batch.daysRemaining <= 90).reduce((sum, batch) => sum + batch.quantity, 0) },
+  ].filter((bucket) => bucket.units > 0)
+  const productDetails = new Map(
+    batches.map((batch) => [batch.productId, batch.product]),
+  )
+  const products = [...stockByProduct.entries()]
+    .map(([productId, onHand]) => {
+      const product = productDetails.get(productId)!
+      return {
+        id: productId,
+        productId,
+        name: product.name,
+        brand: product.manufacturer.name,
+        strength: product.strength,
+        packSize: product.packSize,
+        minOrderQty: product.minOrderQty,
+        onHand,
+        onOrder: openByProduct.get(productId) ?? 0,
+      }
+    })
+    .sort((a, b) => b.onHand - a.onHand)
+
   return NextResponse.json({
     serverTime: new Date().toISOString(),
     summary: {
@@ -134,16 +168,18 @@ export async function GET(req: Request) {
       expiring90: serialized.filter(
         (batch) => batch.daysRemaining > 0 && batch.daysRemaining <= 90,
       ).length,
+      expiringSoon,
       expired: serialized.filter((batch) => batch.daysRemaining <= 0).length,
       openOrderUnits: openOrderItems.reduce((sum, item) => sum + item.quantity, 0),
     },
-    products: [...stockByProduct.entries()]
-      .map(([productId, onHand]) => ({
-        productId,
-        onHand,
-        onOrder: openByProduct.get(productId) ?? 0,
-      }))
-      .sort((a, b) => b.onHand - a.onHand),
+    products,
+    daysCover,
+    topProducts: products.slice(0, 8).map((product) => ({
+      key: product.productId,
+      label: product.name,
+      value: product.onHand,
+      detail: `${product.brand} · ${product.onOrder.toLocaleString("en-IN")} on order`,
+    })),
     batches: serialized,
   })
 }

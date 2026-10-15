@@ -20,8 +20,18 @@ import { prisma } from "@/lib/prisma"
  */
 export const orderDetailInclude = {
   seller: true,
-  items: { include: { product: true } },
-  audits: { orderBy: { createdAt: "asc" } },
+  buyer: true,
+  items: {
+    include: {
+      product: true,
+      allocations: {
+        include: {
+          batch: true,
+        },
+      },
+    },
+  },
+  audits: { orderBy: { createdAt: "asc" as const } },
 } as const
 
 /**

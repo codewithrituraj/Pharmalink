@@ -1,0 +1,5 @@
+import { NextResponse } from "next/server"
+import { requireRole } from "@/lib/access"
+import { notify } from "@/lib/notifications"
+import { prisma } from "@/lib/prisma"
+export async function POST(_req:Request,{params}:{params:Promise<{id:string}>}){const auth=await requireRole("STOCKIST");if("error" in auth)return auth.error;const {id}=await params;const order=await prisma.order.findFirst({where:{id,buyerId:auth.session.user.organizationId,isPaid:false,invoiceNumber:{not:null}},select:{id:true,sellerId:true,invoiceNumber:true,total:true}});if(!order)return NextResponse.json({error:"Outstanding invoice not found"},{status:404});const day=new Date().toISOString().slice(0,10);const result=await notify(prisma,{organizationId:order.sellerId,type:"ORDER_STATUS",title:"Payment follow-up requested",message:`The stockist requested a payment follow-up for invoice ${order.invoiceNumber} (₹${order.total.toFixed(2)}).`,link:"/manufacturer/payments",dedupeKey:`PAYMENT_REMINDER:${order.id}:${day}`});return NextResponse.json(result)}

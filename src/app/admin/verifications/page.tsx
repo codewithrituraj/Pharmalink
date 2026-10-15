@@ -40,11 +40,13 @@ export default function VerificationsPage() {
     }
   }, [])
 
-  const handleAction = async (id: string, action: "VERIFIED" | "REJECTED") => {
+  const handleAction = async (id: string, action: "VERIFIED" | "REJECTED" | "REVIEW") => {
+    const reason = action === "VERIFIED" ? undefined : window.prompt(action === "REJECTED" ? "Rejection reason (required)" : "What additional information is required?")
+    if (action === "REJECTED" && !reason?.trim()) return
     await fetch("/api/admin/verify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, action }),
+      body: JSON.stringify({ id, action, reason }),
     })
     fetchOrgs() // Refresh list
   }
@@ -81,6 +83,7 @@ export default function VerificationsPage() {
                 {org.status === "PENDING" && (
                   <div className="flex gap-2">
                     <Button size="sm" onClick={() => handleAction(org.id, "VERIFIED")}>Approve</Button>
+                    <Button size="sm" variant="outline" onClick={() => handleAction(org.id, "REVIEW")}>More info</Button>
                     <Button size="sm" variant="destructive" onClick={() => handleAction(org.id, "REJECTED")}>Reject</Button>
                   </div>
                 )}

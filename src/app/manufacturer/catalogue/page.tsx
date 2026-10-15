@@ -10,18 +10,18 @@ export default async function CataloguePage() {
   
   const products = await prisma.product.findMany({
     where: { manufacturerId: session?.user.organizationId },
-    include: { batches: true },
+    include: { batches: true, complianceViolations: { where: { active: true } } },
     orderBy: { name: 'asc' },
   })
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="w-full min-w-0 max-w-full space-y-6" style={{ contain: "inline-size" }}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-xl font-semibold">Product Catalogue</h2>
         <CatalogueActions />
       </div>
       
-      <div className="bg-white rounded-lg shadow border p-6">
+      <div className="surface-card min-w-0 max-w-full overflow-hidden rounded-lg border p-3 shadow sm:p-6">
         <Table>
           <TableHeader>
             <TableRow>
@@ -31,6 +31,7 @@ export default async function CataloguePage() {
               <TableHead>PTR (₹)</TableHead>
               <TableHead>PTS (₹)</TableHead>
               <TableHead>Stock Batches</TableHead>
+              <TableHead>Compliance</TableHead>
               <TableHead>Status</TableHead>
             </TableRow>
           </TableHeader>
@@ -48,6 +49,13 @@ export default async function CataloguePage() {
                     {p.batches.length} ({totalStock} units)
                   </TableCell>
                   <TableCell>
+                    {p.complianceViolations.length ? (
+                      <Badge variant="destructive">Above ceiling</Badge>
+                    ) : (
+                      <Badge variant="outline">Clear</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     <Badge variant={p.isActive ? "default" : "secondary"}>
                       {p.isActive ? "Active" : "Inactive"}
                     </Badge>
@@ -57,7 +65,7 @@ export default async function CataloguePage() {
             })}
             {products.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground h-24">
+                <TableCell colSpan={8} className="text-center text-muted-foreground h-24">
                   No products in catalogue. Upload a CSV to get started.
                 </TableCell>
               </TableRow>

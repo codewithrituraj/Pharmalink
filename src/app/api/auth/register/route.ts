@@ -27,6 +27,7 @@ export async function POST(req: Request) {
           type: parsed.type,
           drugLicense: parsed.drugLicense,
           gstNumber: parsed.gstNumber,
+          address: parsed.address,
           status: "PENDING", // Requires admin approval
         },
       })

@@ -42,6 +42,8 @@ export async function GET(req: Request) {
     name: manufacturer.name,
     region: manufacturer.region,
     drugLicense: manufacturer.drugLicense,
+    gstNumber: manufacturer.gstNumber,
+    verificationStatus: manufacturer.status,
     productCount: manufacturer._count.products,
     categories: [...new Set(manufacturer.products.map((product) => product.category))],
     access: manufacturer.grantedAccess[0] ?? null,

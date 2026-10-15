@@ -2,14 +2,29 @@
 
 PharmaLink is a B2B pharmaceutical procurement workspace for verified manufacturers and stockists. It includes role-based authentication, manufacturer discovery and access requests, filtered catalogues, favourites, server-calculated purchase orders, FEFO stock reservation, order tracking, PDF documents, admin verification, and live operational dashboards.
 
-## Run locally
+## Fresh-copy setup
 
-Prerequisites: Node.js 20+ and npm.
+Prerequisites: Node.js 20+ and npm. The frontend, API routes, Prisma schema,
+migrations, seed script, and scheduled-job runner all live in this folder.
+
+1. Install dependencies: `npm install`.
+2. Copy `.env.example` to `.env.local` and replace the secrets.
+3. Generate the Prisma client: `npx prisma generate`.
+4. Apply every checked-in migration: `npx prisma migrate deploy`.
+5. Seed the demo database: `npx prisma db seed`.
+6. Start the combined frontend and API server: `npm run dev`.
+
+The seed resets demo data and creates persisted examples for pending
+verification, low stock, expiry, returns, H1, compliance, invoices,
+outstanding and pending payments, notifications, audit events, and job history.
+
+Equivalent command sequence:
 
 ```bash
 npm install
+cp .env.example .env.local
 npx prisma generate
-npx prisma db push
+npx prisma migrate deploy
 npx prisma db seed
 npm run dev
 ```
@@ -20,7 +35,7 @@ The port and host are pinned in the `dev` and `start` scripts because of a colli
 
 `NEXTAUTH_URL` in `.env.local` must match the host and port in the browser, or sign-in fails on a callback URL mismatch.
 
-The development script uses Webpack because it is more reliable with the current Tailwind/PostCSS setup than the Turbopack CSS worker in this environment.
+The development and production-build scripts use Webpack because it is more reliable with the current Tailwind/PostCSS setup than the Turbopack CSS worker in this environment.
 
 ## Demo accounts
 
@@ -53,12 +68,15 @@ anyone.
 
 - Admin: review pending business verifications at `/admin/verifications`.
 - Manufacturer: review stockist access requests at `/manufacturer/access-requests` and manage products at `/manufacturer/catalogue`.
+- Manufacturer: fulfil orders, confirm payments, decide returns, publish schemes, and export reports under `/manufacturer/*`.
 - Stockist: discover manufacturers and request access at `/stockist/manufacturers`.
 - Stockist: search authorized catalogues, filter by dosage/strength/price/availability/prescription status, inspect product details, favourite products, save drafts, and place one-manufacturer purchase orders at `/stockist/catalogue`.
 - Stockist: search/filter/export orders at `/stockist/orders`; inspect timelines, audit history, cancel valid orders, reorder, and download PO/invoice PDFs at `/stockist/orders/[id]`.
+- Stockist: manage inventory and expiry, submit returns, review H1 records, download invoices, and submit payment references from the ledger.
+- Admin: manage users and review audit, compliance, and H1 records under `/admin/*`.
 - Order placement uses a Prisma transaction and allocates inventory by earliest expiry date first. MOQ, scheme discount, GST, notes, and totals are calculated on the server.
 
-Phase 2 adds the local `pdfkit` dependency for real purchase-order and invoice PDF generation.
+The local `pdfkit` dependency generates real purchase-order and invoice PDFs.
 
 ## Useful commands
 
@@ -81,11 +99,11 @@ forecasts. It needs nothing but the repository.
 `npm run test:integration` runs three suites against a real server. The order
 lifecycle suite checks that the routes call those rules correctly, that one
 organization cannot read another's orders, and that cancelling puts stock back
-where it came from. The authorization suite probes all 27 API routes with the
+where it came from. The authorization suite probes every protected API family with the
 wrong caller: anonymous, a manufacturer against a stockist route, an admin
 against a stockist route, and a stockist against a manufacturer or admin route.
 A refusal is 401, 403, 404 or 400; a 2xx means the route answered someone it
-should have refused. The page suite loads all 18 pages as the role that owns
+should have refused. The page suite loads every checked-in role page as the role that owns
 each one, checks that the other two roles are turned away, checks that a visitor
 with no session is sent to the login page, and checks that an address matching no
 route answers 404 with the app's own page rather than Next's default. It needs a

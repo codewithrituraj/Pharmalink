@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
 
 type Access = { id: string; status: string; message?: string | null }
-type Manufacturer = { id: string; name: string; region: string | null; drugLicense: string | null; productCount: number; categories: string[]; access: Access | null }
+type Manufacturer = { id: string; name: string; region: string | null; drugLicense: string | null; gstNumber: string | null; verificationStatus: string; productCount: number; categories: string[]; access: Access | null }
 
 const statusCopy: Record<string, string> = { VERIFIED: "Approved", PENDING: "Pending", REJECTED: "Rejected" }
 

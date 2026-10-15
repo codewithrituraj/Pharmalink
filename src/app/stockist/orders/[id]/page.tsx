@@ -8,25 +8,10 @@ import { Card, CardContent } from "@/components/ui/card"
 
 import { OrderDetail, type OrderDetail as OrderDetailData } from "./order-detail"
 
-/**
- * The order detail page, reading the order on the server.
- *
- * An order id can be anything, and most of what anyone will type is not a real
- * one. The page checks the order against the buying organization here, for the
- * same reason the route does, and renders the not-found card when there is
- * nothing to show.
- *
- * It answers 200 either way. The stockist layout already turns away anyone who
- * is not signed in as a stockist, so a 404 here would only be a status code for
- * a mistyped or stale link, behind a page that renders perfectly well. The
- * missing-order case is real but expected, and a link to an order that was
- * cancelled still deserves to open.
- */
 export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const session = await getServerSession(authOptions)
-  // The layout guards this already. If it ever stops doing so, the page must not
-  // fall through to a query with no organization to scope it by.
+
   if (!session?.user.organizationId) return null
 
   const order = await loadOrderForBuyer(session.user.organizationId, id)
@@ -53,8 +38,56 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   }
 
   const detail: OrderDetailData = {
-    ...order,
+    id: order.id,
+    poNumber: order.poNumber,
+    status: order.status,
+    total: order.total,
+    subtotal: order.subtotal,
+    discount: order.discount,
+    gst: order.gst,
+    isPaid: order.isPaid ?? false,
+    notes: order.notes,
+    transporter: order.transporter,
+    trackingNumber: order.trackingNumber,
+    expectedDelivery: order.expectedDelivery ? order.expectedDelivery.toISOString() : null,
+    invoiceNumber: order.invoiceNumber,
+    invoiceCreatedAt: order.invoiceCreatedAt ? order.invoiceCreatedAt.toISOString() : null,
     createdAt: order.createdAt.toISOString(),
+    seller: {
+      name: order.seller.name,
+      address: order.seller.address,
+      drugLicense: order.seller.drugLicense,
+      gstNumber: order.seller.gstNumber,
+    },
+    buyer: {
+      name: order.buyer.name,
+      address: order.buyer.address,
+      drugLicense: order.buyer.drugLicense,
+      gstNumber: order.buyer.gstNumber,
+    },
+    items: order.items.map((item) => ({
+      id: item.id,
+      quantity: item.quantity,
+      freeQuantity: item.freeQuantity ?? 0,
+      price: item.price,
+      product: {
+        id: item.product.id,
+        name: item.product.name,
+        genericName: item.product.genericName,
+        packSize: item.product.packSize,
+        mrp: item.product.mrp,
+        ptr: item.product.ptr,
+        availability: item.product.availability,
+      },
+      allocations: item.allocations?.map((a) => ({
+        id: a.id,
+        quantity: a.quantity,
+        batch: {
+          batchNumber: a.batch.batchNumber,
+          expiryDate: a.batch.expiryDate.toISOString(),
+        },
+      })) || [],
+    })),
     audits: order.audits.map((audit) => ({
       id: audit.id,
       status: audit.status,

@@ -14,5 +14,5 @@ export default async function StockistLayout({
     redirect("/login")
   }
 
-  return <AppShell role="STOCKIST" email={session.user.email ?? ""}>{children}</AppShell>
+  return <AppShell role="STOCKIST" email={session.user.email ?? ""} demo={session.user.email === "stockist@city.com"}>{children}</AppShell>
 }

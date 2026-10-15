@@ -386,6 +386,11 @@ export default function ExpiryPage() {
                   >
                     {batch.reason}
                   </p>
+                  {batch.action === "RETURN_OR_CREDIT" ? (
+                    <Link href={`/stockist/returns?batch=${encodeURIComponent(batch.id)}&reason=EXPIRING`} className="mt-3 inline-flex min-h-9 items-center rounded-lg border border-border px-3 text-xs font-medium text-primary hover:bg-muted">
+                      Start prefilled return
+                    </Link>
+                  ) : null}
                 </li>
               ))}
             </ul>

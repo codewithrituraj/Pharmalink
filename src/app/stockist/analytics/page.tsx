@@ -134,7 +134,7 @@ export default function AnalyticsPage() {
             icon={PackageSearch}
             label="Top supplier"
             value={report?.topManufacturer?.label ?? "—"}
-            hint={report?.topManufacturer ? `${report.topManufacturer.share.toFixed(0)}% of spend` : "No spend yet"}
+            hint={report?.topManufacturer ? `${(report.topManufacturer.share * 100).toFixed(0)}% of spend` : "No spend yet"}
           />
         </div>
       )}
@@ -207,7 +207,7 @@ export default function AnalyticsPage() {
                   key: item.label,
                   label: item.label,
                   value: item.value,
-                  detail: `${item.share.toFixed(0)}%`,
+                  detail: `${(item.share * 100).toFixed(0)}%`,
                 }))}
                 valueFormatter={currency.format}
                 emptyMessage="Supplier spend appears once orders are placed."
@@ -226,7 +226,7 @@ export default function AnalyticsPage() {
                   key: item.label,
                   label: item.label,
                   value: item.value,
-                  detail: `${item.share.toFixed(0)}%`,
+                  detail: `${(item.share * 100).toFixed(0)}%`,
                 }))}
                 valueFormatter={currency.format}
                 emptyMessage="Category spend appears once orders are placed."

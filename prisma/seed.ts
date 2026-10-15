@@ -7,16 +7,16 @@ const prisma = new PrismaClient()
 const DEMO_PASSWORD = "password@123"
 
 const manufacturers = [
-  { name: "Apex Pharma", prefix: "apex", drugLicense: "DL-APEX-123", gstNumber: "GST-APEX-123" },
-  { name: "BioCure Labs", prefix: "biocure", drugLicense: "DL-BIO-123", gstNumber: "GST-BIO-123" },
-  { name: "MediLife Sciences", prefix: "medilife", drugLicense: "DL-MED-123", gstNumber: "GST-MED-123" },
-  { name: "Zenith Health", prefix: "zenith", drugLicense: "DL-ZEN-123", gstNumber: "GST-ZEN-123" },
+  { name: "Apex Pharma", prefix: "apex", drugLicense: "MH-TZ4-184920", gstNumber: "27AAPCA1234F1Z5", address: "Plot 42, MIDC Industrial Area, Andheri East, Mumbai, Maharashtra 400093" },
+  { name: "BioCure Labs", prefix: "biocure", drugLicense: "KA-BLR-294811", gstNumber: "29AABCB5678G1Z2", address: "Phase II, Peenya Industrial Area, Bengaluru, Karnataka 560058" },
+  { name: "MediLife Sciences", prefix: "medilife", drugLicense: "DL-DEL-392810", gstNumber: "07AABCM9012H1Z9", address: "Okhla Industrial Area Phase III, New Delhi 110020" },
+  { name: "Zenith Health", prefix: "zenith", drugLicense: "WB-KOL-482019", gstNumber: "19AABCZ3456J1Z4", address: "Sector V, Salt Lake City, Kolkata, West Bengal 700091" },
 ]
 
 const stockists = [
-  { name: "City Medicos", prefix: "city", drugLicense: "DL-CM-456", gstNumber: "GST-CM-456" },
-  { name: "Global Pharma Distributors", prefix: "global", drugLicense: "DL-GPD-456", gstNumber: "GST-GPD-456" },
-  { name: "Prime Healthcare", prefix: "prime", drugLicense: "DL-PH-456", gstNumber: "GST-PH-456" },
+  { name: "City Medicos", prefix: "city", drugLicense: "MH-MUM-592811", gstNumber: "27AABFC7890K1Z1", address: "Shop 12-14, Medical Complex, Dadar West, Mumbai 400028" },
+  { name: "Global Pharma Distributors", prefix: "global", drugLicense: "KA-BLR-683920", gstNumber: "29AABFG2345L1Z8", address: "Brigade Road, Ashok Nagar, Bengaluru 560025" },
+  { name: "Prime Healthcare", prefix: "prime", drugLicense: "DL-ND-782910", gstNumber: "07AABFP6789M1Z6", address: "Connaught Place, New Delhi 110001" },
 ]
 
 const catalogue = [
@@ -58,6 +58,17 @@ function rupees(value: number) {
 async function main() {
   console.log("Resetting and seeding PharmaLink demo data...")
 
+  await prisma.paymentSubmission.deleteMany()
+  await prisma.swapOrder.deleteMany()
+  await prisma.marketplaceListing.deleteMany()
+  await prisma.traceVerificationLog.deleteMany()
+  await prisma.h1RegisterEntry.deleteMany()
+  await prisma.productPriceViolation.deleteMany()
+  await prisma.nppaCeilingPrice.deleteMany()
+  await prisma.returnItem.deleteMany()
+  await prisma.returnRequest.deleteMany()
+  await prisma.auditLog.deleteMany()
+  await prisma.verificationDocument.deleteMany()
   await prisma.scheme.deleteMany()
   await prisma.notification.deleteMany()
   await prisma.favourite.deleteMany()
@@ -76,7 +87,7 @@ async function main() {
   await prisma.user.deleteMany()
   await prisma.organization.deleteMany()
 
-  await prisma.user.create({
+  const adminUser = await prisma.user.create({
     data: {
       email: "admin@pharmalink.com",
       password: await hashPassword(DEMO_PASSWORD),
@@ -91,6 +102,7 @@ async function main() {
         type: "MANUFACTURER",
         drugLicense: manufacturer.drugLicense,
         gstNumber: manufacturer.gstNumber,
+        address: manufacturer.address,
         region: ["West", "South", "North", "East"][index],
         status: "VERIFIED",
         users: {
@@ -111,6 +123,7 @@ async function main() {
         type: "STOCKIST",
         drugLicense: stockist.drugLicense,
         gstNumber: stockist.gstNumber,
+        address: stockist.address,
         region: ["West", "South", "North"][index],
         status: "VERIFIED",
         users: {
@@ -123,6 +136,34 @@ async function main() {
       },
     }))
   )
+
+  await prisma.organization.create({
+    data: {
+      name: "Nova Therapeutics",
+      type: "MANUFACTURER",
+      drugLicense: "GJ-AHD-APP-2041",
+      gstNumber: "24AABCN2041R1Z7",
+      address: "Science City Road, Ahmedabad, Gujarat 380060",
+      region: "West",
+      status: "PENDING",
+      verificationRemark: "Drug-license document awaiting manual review",
+      users: {
+        create: {
+          email: "review@nova.example",
+          password: await hashPassword(DEMO_PASSWORD),
+          role: "MANUFACTURER",
+        },
+      },
+      documents: {
+        create: {
+          name: "drug-license.pdf",
+          mimeType: "application/pdf",
+          size: 184320,
+          path: "seed/documents/nova-drug-license.pdf",
+        },
+      },
+    },
+  })
 
   for (const [manufacturerIndex, manufacturer] of manufacturerRecords.entries()) {
     for (const [stockistIndex, stockist] of stockistRecords.entries()) {
@@ -142,18 +183,21 @@ async function main() {
             manufacturerId: manufacturer.id,
             name: `${brand} ${manufacturer.name.split(" ")[0]} ${variant}`,
             genericName: generic,
+            composition: generic,
             category,
             dosageForm: category === "Vitamins" ? "Capsule" : category === "Respiratory" ? "Inhaler" : "Tablet",
             strength: generic.split(" ").slice(1).join(" "),
             packSize: variant === 1 ? "10 x 10 tablets" : "20 x 10 tablets",
             gstPercent: category === "Vitamins" ? 5 : 12,
             isPrescription: category === "Antibiotics" || category === "Cardiac",
+            isScheduleH1: category === "Antibiotics" && variant === 2,
             storage: category === "Vitamins" ? "Store in a cool, dry place" : "Store below 25 C",
             minOrderQty: variant === 1 ? 5 : 10,
             leadTimeDays: [5, 7, 10, 14][(productCount + variant) % 4],
             mrp: rupees(basePrice * 1.5),
             ptr: rupees(basePrice * 1.1),
             pts: rupees(basePrice),
+            availability: 5000 - manufacturerIndex * 350 + (variant === 1 ? 850 : 180),
             batches: {
               create: [
                 { batchNumber: `B-${manufacturerIndex + 1}-${productCount + 1}-A`, quantity: 5000 - manufacturerIndex * 350, mfgDate: new Date(), expiryDate: futureDate(365 + manufacturerIndex * 90) },
@@ -164,18 +208,48 @@ async function main() {
         })
         seededProducts.push({ id: product.id, basePrice, index: productCount })
 
-        await prisma.scheme.create({
-          data: {
-            productId: product.id,
-            name: `Trade saver: buy ${variant === 1 ? 10 : 20}`,
-            type: "SLAB_DISCOUNT",
-            minQuantity: variant === 1 ? 10 : 20,
-            discountPercent: variant === 1 ? 3 : 5,
-            validFrom: new Date(),
-            validUntil: futureDate(120),
-          },
-        })
-        schemeCount += 1
+        if (variant === 1) {
+          await prisma.scheme.create({
+            data: {
+              productId: product.id,
+              name: "Trade saver: 5% off on 10+",
+              type: "SLAB_DISCOUNT",
+              minQuantity: 10,
+              discountPercent: 5,
+              validFrom: new Date(),
+              validUntil: futureDate(120),
+            },
+          })
+          schemeCount += 1
+          if (productCount % 3 === 0) {
+            await prisma.scheme.create({
+              data: {
+                productId: product.id,
+                name: "Mega slab: 10% off on 50+",
+                type: "SLAB_DISCOUNT",
+                minQuantity: 50,
+                discountPercent: 10,
+                validFrom: new Date(),
+                validUntil: futureDate(120),
+              },
+            })
+            schemeCount += 1
+          }
+        } else {
+          await prisma.scheme.create({
+            data: {
+              productId: product.id,
+              name: "Bonus pack: Buy 10 Get 1 Free",
+              type: "FREE_GOODS",
+              minQuantity: 10,
+              freeQuantity: 1,
+              discountPercent: 0,
+              validFrom: new Date(),
+              validUntil: futureDate(120),
+            },
+          })
+          schemeCount += 1
+        }
         productCount += 1
       }
     }
@@ -269,8 +343,13 @@ async function main() {
           total,
           poNumber: `PO-${placedAt.getFullYear()}${String(placedAt.getMonth() + 1).padStart(2, "0")}-${String(orderCount + 1).padStart(4, "0")}`,
           invoiceNumber: `INV-${String(orderCount + 1).padStart(4, "0")}`,
-          transporter: "PharmaLink Logistics",
+          invoiceCreatedAt: placedAt,
+          isPaid: monthAgo > 2,
+          paidAt: monthAgo > 2 ? new Date(placedAt.getTime() + 15 * 86_400_000) : null,
+          paymentRef: monthAgo > 2 ? `NEFT-${String(orderCount + 1).padStart(6, "0")}` : null,
+          transporter: "PharmaLink Express",
           trackingNumber: `TRK${String(orderCount + 1).padStart(8, "0")}`,
+          expectedDelivery: new Date(placedAt.getTime() + 4 * 86_400_000),
           createdAt: placedAt,
           items: {
             create: lines.map((line) => ({
@@ -347,6 +426,14 @@ async function main() {
     const index = stockedIndex
     stockedIndex += 1
     const stockist = stockistRecords[0]
+    const sourceLine = await prisma.orderItem.findFirst({
+      where: {
+        productId: seeded.id,
+        order: { buyerId: stockist.id, status: "DELIVERED" },
+      },
+      select: { orderId: true },
+      orderBy: { order: { createdAt: "desc" } },
+    })
     const monthlyDemand = Math.max(12, Math.round((demandByProduct.get(seeded.id) ?? 0) / 12))
     // Every seventh product is deliberately thin, to trigger low-stock alerts and
     // stock-out watch entries.
@@ -381,6 +468,7 @@ async function main() {
           mfgDate: pastDate(item.expiryInDays > 200 ? 60 + recipeIndex * 30 : 300 - recipeIndex * 20),
           expiryDate: futureDate(item.expiryInDays),
           receivedAt: pastDate(recipeIndex * 24 + 10),
+          sourceOrderId: sourceLine?.orderId,
         },
       })
       inventoryBatchCount += 1
@@ -409,8 +497,11 @@ async function main() {
         gst,
         total: subtotal + gst,
         poNumber: `PO-LIVE-${index + 1}`,
-        transporter: status === "DISPATCHED" ? "PharmaLink Logistics" : null,
-        trackingNumber: status === "DISPATCHED" ? `TRKLIVE${index + 1}` : null,
+        invoiceNumber: status !== "PLACED" ? `INV-LIVE-${index + 1}` : null,
+        invoiceCreatedAt: status !== "PLACED" ? createdAt : null,
+        transporter: status === "DISPATCHED" ? "BlueDart Express" : status === "APPROVED" ? "Delhivery Surface" : null,
+        trackingNumber: status === "DISPATCHED" ? `BD982341${index + 1}IN` : null,
+        expectedDelivery: futureDate(index + 3),
         createdAt,
         items: { create: [{ productId: product.id, quantity, price }] },
         audits: {
@@ -445,6 +536,121 @@ async function main() {
       })
     }
   }
+
+  // Persisted examples for every Phase 4/5 screen. These are deliberately
+  // created through the same relational shapes the APIs read, so a fresh seed
+  // demonstrates real returns, H1 compliance, payment review, notifications,
+  // audit history, and scheduled-job history without a manual warm-up step.
+  const demoStockist = stockistRecords[0]
+  const demoManufacturer = manufacturerRecords[0]
+  const deliveredOrder = await prisma.order.findFirst({
+    where: { buyerId: demoStockist.id, status: "DELIVERED" },
+    include: { items: { include: { product: true } } },
+    orderBy: { createdAt: "desc" },
+  })
+  const returnBatch = await prisma.inventoryBatch.findFirst({
+    where: {
+      stockistId: demoStockist.id,
+      quantity: { gt: 5 },
+      sourceOrderId: { not: null },
+      expiryDate: { gt: new Date(), lte: futureDate(90) },
+    },
+    include: { product: true },
+    orderBy: { expiryDate: "asc" },
+  })
+  if (returnBatch) {
+    await prisma.returnRequest.create({
+      data: {
+        orderId: returnBatch.sourceOrderId,
+        buyerId: demoStockist.id,
+        sellerId: returnBatch.product.manufacturerId,
+        reason: "EXPIRING",
+        status: "REQUESTED",
+        remark: "Batch is within the agreed near-expiry return window.",
+        total: rupees(returnBatch.product.ptr * 5),
+        items: { create: [{ inventoryBatchId: returnBatch.id, productId: returnBatch.productId, quantity: 5 }] },
+      },
+    })
+  }
+
+  const h1Item = await prisma.orderItem.findFirst({
+    where: { order: { buyerId: demoStockist.id }, product: { isScheduleH1: true } },
+    include: { order: true, product: true },
+    orderBy: { order: { createdAt: "desc" } },
+  })
+  if (h1Item) {
+    await prisma.h1RegisterEntry.create({
+      data: {
+        orderId: h1Item.orderId,
+        orderItemId: h1Item.id,
+        productId: h1Item.productId,
+        buyerId: demoStockist.id,
+        buyerName: demoStockist.name,
+        patientName: "Aarav Sharma",
+        prescriberName: "Dr. Meera Kulkarni",
+        prescriberRegistrationNumber: "MMC-2014-08231",
+        quantity: h1Item.quantity,
+        createdAt: h1Item.order.createdAt,
+      },
+    })
+  }
+
+  const complianceProduct = await prisma.product.findFirst({ where: { manufacturerId: demoManufacturer.id }, orderBy: { name: "asc" } })
+  if (complianceProduct) {
+    const ceiling = await prisma.nppaCeilingPrice.create({
+      data: {
+        drugName: complianceProduct.genericName,
+        composition: complianceProduct.composition,
+        packSize: complianceProduct.packSize,
+        ceilingPrice: rupees(complianceProduct.mrp - 5),
+        effectiveDate: pastDate(45),
+      },
+    })
+    await prisma.productPriceViolation.create({
+      data: {
+        productId: complianceProduct.id,
+        manufacturerId: demoManufacturer.id,
+        referenceId: ceiling.id,
+        submittedMrp: complianceProduct.mrp,
+        ceilingPrice: ceiling.ceilingPrice,
+      },
+    })
+  }
+
+  if (deliveredOrder) {
+    const pendingAmount = rupees(Math.min(deliveredOrder.total, deliveredOrder.total * 0.4))
+    await prisma.paymentSubmission.create({
+      data: {
+        orderId: deliveredOrder.id,
+        stockistId: deliveredOrder.buyerId,
+        manufacturerId: deliveredOrder.sellerId,
+        amount: pendingAmount,
+        reference: "UTR-SEED-PENDING-001",
+        status: "SUBMITTED",
+      },
+    })
+    await prisma.order.update({
+      where: { id: deliveredOrder.id },
+      data: { paymentStatus: "SUBMITTED", paidAmount: 0, paymentRef: "UTR-SEED-PENDING-001" },
+    })
+  }
+
+  await prisma.notification.createMany({
+    data: [
+      { organizationId: demoStockist.id, type: "LOW_STOCK", title: "Low stock needs attention", message: "A fast-moving batch has fallen below its reorder point.", severity: "WARNING", link: "/stockist/insights", dedupeKey: "seed-low-stock" },
+      { organizationId: demoStockist.id, type: "EXPIRY", title: "Batch expires soon", message: "A near-expiry batch is ready for return review.", severity: "CRITICAL", link: "/stockist/expiry", dedupeKey: "seed-expiry" },
+      { organizationId: demoManufacturer.id, type: "ACCESS_REQUEST", title: "New stockist access request", message: "A verified stockist is waiting for a catalogue decision.", link: "/manufacturer/access-requests", dedupeKey: "seed-access" },
+    ],
+  })
+  await prisma.jobRun.create({
+    data: { job: "inventory-alerts", status: "SUCCESS", trigger: "SEED", notificationsCreated: 3, summary: "Seeded low-stock, expiry, and access examples", finishedAt: new Date() },
+  })
+  await prisma.auditLog.createMany({
+    data: [
+      { actorId: adminUser.id, organizationId: demoManufacturer.id, action: "ORGANIZATION_VERIFIED", entityType: "Organization", entityId: demoManufacturer.id, detail: "Seeded approval history" },
+      { actorId: adminUser.id, organizationId: demoStockist.id, action: "COMPLIANCE_REVIEWED", entityType: "Organization", entityId: demoStockist.id, detail: "Seeded compliance review" },
+    ],
+  })
 
   console.log(`Created ${productCount} products, ${schemeCount} schemes, ${manufacturerRecords.length} manufacturers, and ${stockistRecords.length} stockists.`)
   console.log(`Created ${orderCount} orders (${deliveredCount} delivered) and ${inventoryBatchCount} current inventory batches.`)

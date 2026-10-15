@@ -27,6 +27,7 @@ export default function RegisterPage() {
       type: "STOCKIST",
       drugLicense: "",
       gstNumber: "",
+      address: "",
     },
   })
 
@@ -100,6 +101,11 @@ export default function RegisterPage() {
                   <label className="text-sm font-medium">Drug License Number</label>
                   <Input placeholder="DL-XXX-123" {...register("drugLicense")} />
                   {errors.drugLicense && <p className="text-xs text-red-500">{errors.drugLicense.message}</p>}
+                </div>
+                <div className="col-span-2 space-y-2">
+                  <label className="text-sm font-medium">Business address</label>
+                  <Input placeholder="Street, city, state and PIN" {...register("address")} />
+                  {errors.address && <p className="text-xs text-red-500">{errors.address.message}</p>}
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">GST Number</label>

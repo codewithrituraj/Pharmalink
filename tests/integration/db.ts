@@ -56,6 +56,12 @@ export async function registerRivalStockist(base: string) {
   if (!res.ok) {
     throw new Error(`Could not register the rival stockist: HTTP ${res.status}`)
   }
+  // Registration correctly leaves a real business pending admin review. These
+  // isolation tests need a fully activated second tenant, so promote only the
+  // test organization here instead of weakening production verification gates.
+  const user = await prisma.user.findUniqueOrThrow({ where: { email }, select: { organizationId: true } })
+  if (!user.organizationId) throw new Error("Registered rival stockist has no organization")
+  await prisma.organization.update({ where: { id: user.organizationId }, data: { status: "VERIFIED" } })
   return email
 }
 

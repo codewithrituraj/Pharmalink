@@ -304,16 +304,14 @@ export default function InsightsPage() {
                   />
                 </div>
 
-                <details className="rounded-xl bg-muted/60 p-4 text-sm">
-                  <summary className="flex cursor-pointer items-center gap-2 font-medium">
-                    <Info className="size-4" /> How this forecast is calculated
-                  </summary>
+                <div className="rounded-xl bg-muted/60 p-4 text-sm">
+                  <p className="flex items-center gap-2 font-medium"><Info className="size-4" /> How this forecast is calculated</p>
                   <ul className="mt-3 list-disc space-y-1.5 pl-5 text-muted-foreground">
                     {selected.assumptions.map((assumption) => (
                       <li key={assumption}>{assumption}</li>
                     ))}
                   </ul>
-                </details>
+                </div>
               </div>
             )}
           </CardContent>
@@ -377,7 +375,7 @@ export default function InsightsPage() {
                           manufacturerId={item.manufacturerId}
                           productId={item.productId}
                           quantity={item.suggestedQuantity}
-                          label="Add to PO"
+                          label="Create order"
                         />
                       </div>
                     </li>
@@ -407,22 +405,25 @@ export default function InsightsPage() {
                 />
               ) : (
                 <ul className="divide-y divide-border">
-                  {(data?.products.stockoutRisk ?? []).slice(0, 8).map((risk) => (
+                  {(data?.products.stockoutRisk ?? []).slice(0, 8).map((risk) => {
+                    const reorder = reorders.find((item) => item.productId === risk.productId)
+                    return (
                     <li key={risk.productId} className="flex flex-wrap items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
                       <div className="min-w-0">
                         <p className="text-sm font-medium">{risk.productName}</p>
                         <p className="mt-0.5 text-xs text-muted-foreground">{risk.explanation}</p>
                       </div>
-                      <div className="text-right">
+                      <div className="flex flex-col items-end gap-2 text-right">
                         <p className="number text-sm font-semibold">
                           {risk.daysOfStock !== null ? `${risk.daysOfStock} days` : "—"}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {risk.onHand.toLocaleString("en-IN")} units on hand
                         </p>
+                        {reorder ? <ReorderButton manufacturerId={reorder.manufacturerId} productId={reorder.productId} quantity={reorder.suggestedQuantity} label="Create order" variant="outline" /> : <Link href="/stockist/catalogue" className={buttonVariants({variant:"outline",size:"sm"})}>Review catalogue</Link>}
                       </div>
                     </li>
-                  ))}
+                  )})}
                 </ul>
               )}
             </CardContent>

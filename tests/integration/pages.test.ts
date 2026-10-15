@@ -38,20 +38,36 @@ const stockistPages = [
   "/stockist/analytics",
   "/stockist/catalogue",
   "/stockist/expiry",
+  "/stockist/h1-register",
   "/stockist/insights",
   "/stockist/inventory",
+  "/stockist/invoices",
+  "/stockist/ledger",
   "/stockist/manufacturers",
   "/stockist/notifications",
   "/stockist/orders",
+  "/stockist/returns",
 ]
 
 const manufacturerPages = [
   "/manufacturer",
   "/manufacturer/access-requests",
   "/manufacturer/catalogue",
+  "/manufacturer/orders",
+  "/manufacturer/payments",
+  "/manufacturer/reports",
+  "/manufacturer/returns",
+  "/manufacturer/schemes",
 ]
 
-const adminPages = ["/admin", "/admin/verifications"]
+const adminPages = [
+  "/admin",
+  "/admin/audit",
+  "/admin/compliance",
+  "/admin/h1-register",
+  "/admin/users",
+  "/admin/verifications",
+]
 
 const publicPages = ["/login", "/register"]
 

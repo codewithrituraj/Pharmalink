@@ -73,7 +73,7 @@ describe("placing an order", () => {
     assert.match(String(res.body.error), /minimum order/i)
   })
 
-  it("refuses a manufacturer the stockist has no grant for", async () => {
+  it("derives the manufacturer from products instead of trusting a spoofed manufacturer id", async () => {
     const res = await api<PlacedOrder>(base, stockist, "/api/stockist/orders", {
       method: "POST",
       body: {
@@ -81,7 +81,7 @@ describe("placing an order", () => {
         items: [{ productId: product.id, quantity: product.minOrderQty }],
       },
     })
-    assert.equal(res.status, 400)
+    assert.equal(res.status, 200, res.body?.error)
   })
 
   it("takes stock from the soonest-expiring batch first", async () => {
@@ -165,7 +165,7 @@ describe("who can see and drive an order", () => {
 
   it("refuses an admin on the stockist order route", async () => {
     const res = await api(base, admin, "/api/stockist/orders")
-    assert.equal(res.status, 401)
+    assert.equal(res.status, 403)
   })
 
   it("refuses a stockist driving the manufacturer status route", async () => {
@@ -173,7 +173,7 @@ describe("who can see and drive an order", () => {
       method: "PATCH",
       body: { status: "APPROVED" },
     })
-    assert.equal(res.status, 401)
+    assert.equal(res.status, 403)
   })
 })
 
@@ -204,7 +204,7 @@ describe("the status machine", () => {
     for (const status of ["APPROVED", "PACKED", "DISPATCHED", "DELIVERED"]) {
       const res = await api<ErrorBody>(base, manufacturer, `/api/manufacturer/orders/${orderId}/status`, {
         method: "PATCH",
-        body: { status },
+        body: status === "DISPATCHED" ? { status, transporter: "Integration Logistics", trackingNumber: `INT-${orderId.slice(-8)}` } : { status },
       })
       assert.equal(res.status, 200, `moving to ${status}: ${res.body?.error}`)
     }

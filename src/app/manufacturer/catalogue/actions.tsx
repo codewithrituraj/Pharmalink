@@ -1,66 +1,6 @@
 "use client"
-
-import { useState } from "react"
+import { FormEvent, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-
-export default function CatalogueActions() {
-  const router = useRouter()
-  const [uploading, setUploading] = useState(false)
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    setUploading(true)
-    
-    // Read the CSV
-    const reader = new FileReader()
-    reader.onload = async (event) => {
-      const text = event.target?.result as string
-      // Basic CSV parsing
-      const lines = text.split('\n').filter(line => line.trim())
-      const products = lines.slice(1).map(line => {
-        const values = line.split(',')
-        return {
-          name: values[0],
-          genericName: values[1],
-          mrp: parseFloat(values[2]),
-          ptr: parseFloat(values[3]),
-          pts: parseFloat(values[4]),
-        }
-      })
-
-      // Send to API
-      await fetch('/api/manufacturer/catalogue', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ products }),
-      })
-      
-      setUploading(false)
-      router.refresh()
-    }
-    
-    reader.readAsText(file)
-  }
-
-  return (
-    <div className="flex gap-2">
-      <div className="relative">
-        <Input 
-          type="file" 
-          accept=".csv" 
-          onChange={handleFileUpload} 
-          disabled={uploading}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-        />
-        <Button disabled={uploading}>
-          {uploading ? "Uploading..." : "Upload CSV"}
-        </Button>
-      </div>
-      <Button variant="outline">Download Template</Button>
-    </div>
-  )
-}
+export default function CatalogueActions() { const router = useRouter(); const [open, setOpen] = useState(false); const [uploading, setUploading] = useState(false); const [message, setMessage] = useState<string | null>(null); async function create(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const form = new FormData(event.currentTarget); const numeric = (key: string) => Number(form.get(key)); const response = await fetch("/api/manufacturer/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: form.get("name"), genericName: form.get("genericName"), category: form.get("category"), packSize: form.get("packSize"), mrp: numeric("mrp"), ptr: numeric("ptr"), pts: numeric("ptr"), gstPercent: numeric("gstPercent"), minOrderQty: numeric("minOrderQty"), availability: numeric("availability") }) }); const data = await response.json(); setMessage(response.ok ? "Product created." : data.error ?? "Could not create product."); if (response.ok) { setOpen(false); router.refresh() } } async function upload(e: React.ChangeEvent<HTMLInputElement>) { const file = e.target.files?.[0]; if (!file) return; setUploading(true); const text = await file.text(); const rows = text.split(/\r?\n/).filter(Boolean); const headers = rows.shift()?.split(",").map((v) => v.trim()) ?? []; const products = rows.map((row) => Object.fromEntries(row.split(",").map((value, index) => [headers[index], value.trim()]))).map((row) => ({ ...row, mrp: Number(row.mrp), ptr: Number(row.ptr), pts: Number(row.pts ?? row.ptr), gstPercent: Number(row.gstPercent ?? 12), minOrderQty: Number(row.minOrderQty ?? 1), availability: Number(row.availability ?? 0) })); const response = await fetch("/api/manufacturer/catalogue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ products }) }); const data = await response.json(); setUploading(false); setMessage(response.ok ? `${data.imported} products imported.` : `Import report: ${(data.report ?? []).filter((row: { valid: boolean }) => !row.valid).length} invalid rows.`); if (response.ok) router.refresh() } return <div className="flex flex-wrap justify-end gap-2"><Button variant="outline" onClick={() => setOpen((value) => !value)}>Add product</Button><label className="inline-flex cursor-pointer"><Input type="file" accept=".csv" onChange={upload} disabled={uploading} className="sr-only"/><span className="inline-flex h-10 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground">{uploading ? "Importing…" : "Import CSV"}</span></label>{open ? <form onSubmit={create} className="absolute right-5 top-24 z-20 grid w-[min(34rem,calc(100vw-2.5rem))] gap-3 rounded-xl border border-border bg-card p-5 shadow-xl sm:grid-cols-2"><input required name="name" placeholder="Product name" className="h-10 rounded-lg border border-border bg-background px-3"/><input required name="genericName" placeholder="Composition" className="h-10 rounded-lg border border-border bg-background px-3"/><input required name="category" placeholder="Category" className="h-10 rounded-lg border border-border bg-background px-3"/><input required name="packSize" placeholder="Pack size" className="h-10 rounded-lg border border-border bg-background px-3"/><input required name="mrp" type="number" min="0" step="0.01" placeholder="MRP" className="h-10 rounded-lg border border-border bg-background px-3"/><input required name="ptr" type="number" min="0" step="0.01" placeholder="PTR" className="h-10 rounded-lg border border-border bg-background px-3"/><input required name="gstPercent" type="number" defaultValue="12" className="h-10 rounded-lg border border-border bg-background px-3"/><input required name="minOrderQty" type="number" defaultValue="1" className="h-10 rounded-lg border border-border bg-background px-3"/><input required name="availability" type="number" defaultValue="0" className="h-10 rounded-lg border border-border bg-background px-3"/><Button type="submit">Save product</Button></form> : null}{message ? <p className="basis-full text-right text-xs text-muted-foreground">{message}</p> : null}</div> }

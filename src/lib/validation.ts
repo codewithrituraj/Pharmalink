@@ -38,7 +38,33 @@ export const registerSchema = z.object({
   type: z.enum(["MANUFACTURER", "STOCKIST"]),
   drugLicense: z.string().min(1, "Drug License is required"),
   gstNumber: z.string().min(1, "GST Number is required"),
+  // Existing Phase 1 registrations did not collect an address. New registrations
+  // can provide it for verification without invalidating that established payload.
+  address: z.string().trim().max(500).optional(),
 })
+
+export const productSchema = z.object({
+  name: z.string().trim().min(2).max(160),
+  genericName: z.string().trim().min(2).max(160),
+  composition: z.string().trim().min(2).max(240).optional(),
+  category: z.string().trim().min(2).max(80),
+  dosageForm: z.string().trim().min(2).max(80).optional(),
+  strength: z.string().trim().max(80).optional(),
+  packSize: z.string().trim().min(1).max(80),
+  mrp: z.number().nonnegative(), ptr: z.number().nonnegative(), pts: z.number().nonnegative(),
+  gstPercent: z.number().min(0).max(28), minOrderQty: z.number().int().positive(),
+  availability: z.number().int().nonnegative(), imageUrl: z.string().url().optional().or(z.literal("")),
+  isActive: z.boolean().optional(),
+  isScheduleH1: z.boolean().optional(),
+  requiresColdChain: z.boolean().optional(),
+})
+
+export const schemeSchema = z.object({
+  productId: z.string().min(1), name: z.string().trim().min(2).max(120),
+  type: z.enum(["SLAB_DISCOUNT", "FREE_GOODS"]), minQuantity: z.number().int().positive(),
+  discountPercent: z.number().min(0).max(100).default(0), freeQuantity: z.number().int().nonnegative().default(0),
+  stockistId: z.string().optional().nullable(), validFrom: z.string().datetime(), validUntil: z.string().datetime(),
+}).refine((value) => new Date(value.validUntil) > new Date(value.validFrom), { message: "End date must be after start date", path: ["validUntil"] })
 
 export const signInSchema = z.object({
   email: z.string().email("Invalid email address"),

@@ -54,7 +54,13 @@ export function totalAllocated(allocations: Allocation[]) {
   return allocations.reduce((sum, allocation) => sum + allocation.quantity, 0)
 }
 
-export type SchemeInput = { minQuantity: number; discountPercent: number }
+export type SchemeInput = {
+  name?: string
+  type?: string
+  minQuantity: number
+  discountPercent?: number
+  freeQuantity?: number
+}
 
 export type PricedLineInput = {
   quantity: number
@@ -66,6 +72,7 @@ export type PricedLineInput = {
 export type PricedLine = {
   lineTotal: number
   discount: number
+  freeQuantity: number
   taxable: number
   gst: number
   total: number
@@ -96,12 +103,17 @@ export function bestScheme(
 ): SchemeInput | null {
   const eligible = schemes.filter((scheme) => quantity >= scheme.minQuantity)
   if (eligible.length === 0) return null
-  return eligible.reduce((best, scheme) =>
-    scheme.minQuantity > best.minQuantity ||
-    (scheme.minQuantity === best.minQuantity && scheme.discountPercent > best.discountPercent)
-      ? scheme
-      : best,
-  )
+  return eligible.reduce((best, scheme) => {
+    const sDisc = scheme.discountPercent ?? 0
+    const bDisc = best.discountPercent ?? 0
+    const sFree = scheme.freeQuantity ?? 0
+    const bFree = best.freeQuantity ?? 0
+    if (scheme.minQuantity > best.minQuantity) return scheme
+    if (scheme.minQuantity === best.minQuantity) {
+      if (sDisc > bDisc || sFree > bFree) return scheme
+    }
+    return best
+  })
 }
 
 /**
@@ -116,7 +128,12 @@ export function priceLines(lines: PricedLineInput[]): PricedOrder {
   const priced = lines.map((line) => {
     const lineTotal = paise(line.unitPrice * line.quantity)
     const scheme = bestScheme(line.quantity, line.schemes)
-    const lineDiscount = scheme ? paise(lineTotal * (scheme.discountPercent / 100)) : 0
+    const discountPercent = scheme?.discountPercent ?? 0
+    const lineDiscount = discountPercent > 0 ? paise(lineTotal * (discountPercent / 100)) : 0
+    const freeQuantity =
+      scheme && (scheme.type === "FREE_GOODS" || (scheme.freeQuantity && scheme.freeQuantity > 0))
+        ? Math.floor(line.quantity / scheme.minQuantity) * (scheme.freeQuantity ?? 0)
+        : 0
     const taxable = paise(lineTotal - lineDiscount)
     const lineGst = paise(taxable * (line.gstPercent / 100))
 
@@ -127,6 +144,7 @@ export function priceLines(lines: PricedLineInput[]): PricedOrder {
     return {
       lineTotal,
       discount: lineDiscount,
+      freeQuantity,
       taxable,
       gst: lineGst,
       total: paise(taxable + lineGst),

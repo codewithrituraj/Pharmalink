@@ -27,6 +27,9 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { useApiResource } from "@/hooks/use-api-resource"
 import { cn } from "@/lib/utils"
+import { ImportListButton } from "@/components/stockist/import-list-button"
+import { BarcodeScanner } from "@/components/stockist/barcode-scanner"
+import { ColdChainButton } from "@/components/stockist/cold-chain-button"
 
 type ProductOption = { id: string; name: string; brand: string; strength: string; packSize: string; minOrderQty: number }
 type BatchRow = {
@@ -207,12 +210,10 @@ export default function InventoryPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="My Inventory"
+        title="Batch stock"
         description="Every batch you hold, with real batch numbers and expiry dates taken from the manufacturer. Stock is received first-expiry-first-out, so the batch closest to expiry is always consumed first."
         actions={
-          <Button onClick={openAdd} disabled={loading || !data?.products.length}>
-            <Plus className="size-4" /> Add batch
-          </Button>
+          <div className="flex flex-wrap gap-2"><ImportListButton mode="inventory" onImported={refresh}/><Button className="min-h-11" onClick={openAdd} disabled={loading || !data?.products.length}><Plus className="size-4" /> Add batch</Button></div>
         }
       />
 
@@ -415,6 +416,7 @@ export default function InventoryPage() {
                               </div>
                               <div className="flex items-center gap-1.5">
                                 <Badge variant={batchTone.variant}>{batchTone.label}</Badge>
+                                <ColdChainButton batchId={batch.id} batchNumber={batch.batchNumber} />
                                 <Button
                                   size="icon-sm"
                                   variant="ghost"
@@ -490,6 +492,7 @@ export default function InventoryPage() {
                     onChange={(event) => setForm({ ...form, batchNumber: event.target.value })}
                     placeholder="e.g. AMX-2291"
                   />
+                  {!editing ? <BarcodeScanner onDetected={(value) => setForm((current) => ({ ...current, batchNumber: value }))} /> : null}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="quantity">Quantity</Label>

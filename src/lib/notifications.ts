@@ -10,6 +10,10 @@ export const NOTIFICATION_TYPES = [
   "LOW_STOCK",
   "EXPIRY",
   "SCHEME",
+  "VERIFICATION_DECISION",
+  "RETURN_REQUEST",
+  "RETURN_DECISION",
+  "INVOICE_READY",
 ] as const
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number]
@@ -41,6 +45,10 @@ const SEVERITY_BY_TYPE: Record<NotificationType, NotificationSeverity> = {
   ACCESS_REQUEST: "INFO",
   ACCESS_DECISION: "INFO",
   SCHEME: "INFO",
+  VERIFICATION_DECISION: "INFO",
+  RETURN_REQUEST: "WARNING",
+  RETURN_DECISION: "INFO",
+  INVOICE_READY: "INFO",
   LOW_STOCK: "WARNING",
   EXPIRY: "WARNING",
 }
@@ -103,6 +111,10 @@ export const NOTIFICATION_TYPE_LABEL: Record<NotificationType, string> = {
   LOW_STOCK: "Low stock",
   EXPIRY: "Expiry alert",
   SCHEME: "New scheme",
+  VERIFICATION_DECISION: "Verification update",
+  RETURN_REQUEST: "Return request",
+  RETURN_DECISION: "Return decision",
+  INVOICE_READY: "Invoice ready",
 }
 
 export const NOTIFICATION_TYPE_GROUP: Record<NotificationType, string> = {
@@ -113,4 +125,8 @@ export const NOTIFICATION_TYPE_GROUP: Record<NotificationType, string> = {
   LOW_STOCK: "supply",
   EXPIRY: "supply",
   SCHEME: "supply",
+  VERIFICATION_DECISION: "account",
+  RETURN_REQUEST: "returns",
+  RETURN_DECISION: "returns",
+  INVOICE_READY: "orders",
 }
