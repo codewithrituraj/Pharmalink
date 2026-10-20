@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack --port 4321 --hostname 127.0.0.1",
-    "build": "prisma generate && next build --webpack",
+    "build": "prisma generate && prisma db push --skip-generate && prisma db seed && next build --webpack",
     "start": "next start --port 4321 --hostname 127.0.0.1",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
