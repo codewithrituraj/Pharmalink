@@ -45,5 +45,12 @@ export async function POST(request: Request) {
     if (!response.ok) return NextResponse.json({ error: body?.message ?? "Role details could not be saved" }, { status: 409 })
   }
 
-  return NextResponse.json({ ok: true, message: "Registration submitted for verification" }, { status: 201 })
+  return NextResponse.json({
+    ok: true,
+    message: "Registration submitted for verification",
+    access_token: signupBody.access_token,
+    refresh_token: signupBody.refresh_token,
+    expires_in: signupBody.expires_in,
+    user: signupBody.user,
+  }, { status: 201 })
 }
