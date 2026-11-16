@@ -12,7 +12,7 @@ async function main() {
 
   try {
     const existing = await prisma.$queryRawUnsafe<Array<{ table_name: string | null }>>(
-      `SELECT to_regclass('public."User"') AS table_name`,
+      `SELECT to_regclass('public."User"')::text AS table_name`,
     )
 
     if (existing[0]?.table_name) {
