@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server"
-import { supabaseAdmin } from "@/lib/supabase"
+import { supabasePublic } from "@/lib/supabase"
 
 export const dynamic = "force-dynamic"
 
 export async function GET() {
   try {
-    const { error } = await supabaseAdmin.from("profiles").select("id").limit(1)
+    // This is a read-only probe, so it must not require the privileged
+    // service-role secret just to report database availability.
+    const { error } = await supabasePublic.from("profiles").select("id").limit(1)
 
     if (error) {
       return NextResponse.json({ ok: false, database: "error", error: error.message }, { status: 503 })
