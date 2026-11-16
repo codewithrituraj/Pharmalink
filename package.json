@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack --port 4321 --hostname 127.0.0.1",
-    "build": "prisma generate && tsx scripts/bootstrap-postgres.ts && prisma db seed && next build --webpack",
+    "build": "prisma generate && tsx scripts/bootstrap-postgres.ts && next build --webpack",
     "start": "next start --port ${PORT:-4321} --hostname 0.0.0.0",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
